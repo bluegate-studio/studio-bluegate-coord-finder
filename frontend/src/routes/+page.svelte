@@ -504,7 +504,7 @@
 
         const payload = {
             real: saved_coords.map(c => ({ x: c.rx, y: c.ry })),
-            resized: saved_coords.map(c => ({ x: c.x, y: c.y })),
+            scaled: saved_coords.map(c => ({ x: c.x, y: c.y })),
         };
 
         try {
@@ -781,7 +781,7 @@
                 </div>
 
                 <div class="info-row">
-                    <span class="info-row__label">Actual size</span>
+                    <span class="info-row__label">Scaled size</span>
                     <span class="info-row__value">{rendered_w} × {rendered_h} px</span>
                 </div>
 
@@ -828,7 +828,7 @@
                     <thead>
                         <tr>
                             <th class="coord-table__th" rowspan="2">#</th>
-                            <th class="coord-table__th coord-table__th--group" colspan="2">Resized</th>
+                            <th class="coord-table__th coord-table__th--group" colspan="2">Scaled</th>
                             <th class="coord-table__th coord-table__th--group" colspan="2">Real</th>
                             <th class="coord-table__th" rowspan="2"></th>
                         </tr>
