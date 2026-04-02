@@ -9,15 +9,7 @@
         "upgrade": "bun update --latest --interactive && rm -rf node_modules && bun install --force"
     },
     "dependencies": {
-        "@lucide/svelte": "^1.7.0",
-        "blue-js": "git+https://github.com/bluegate-studio/blue-js.git",
-        "dexie": "^4.4.2",
-        "embla-carousel": "^8.6.0",
-        "embla-carousel-autoplay": "^8.6.0",
-        "embla-carousel-svelte": "^8.6.0",
-        "exceljs": "^4.4.0",
-        "glightbox": "^3.3.1",
-        "svelte-tel-input": "^4.0.2"
+        "@lucide/svelte": "^1.7.0"
     },
     "devDependencies": {
         "@sveltejs/adapter-static": "^3.0.10",
