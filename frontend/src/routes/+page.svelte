@@ -1,9 +1,15 @@
 <script>
-    import { ImageUp, ClipboardCopy, Trash2 } from '@lucide/svelte';
+    import { ImageUp, ClipboardCopy, Trash2, MousePointer2 } from '@lucide/svelte';
 
     let image_src = $state(null);
     let file_name = $state('');
     let is_dragging = $state(false);
+    let started = $state(false);
+
+    /* ── Custom cursor image (no-op for now) ──────── */
+    let cursor_src = $state(null);
+    let cursor_name = $state('');
+    let is_dragging_cursor = $state(false);
 
     let natural_w = $state(0);
     let natural_h = $state(0);
@@ -68,6 +74,42 @@
 
     function handle_drag_leave() {
         is_dragging = false;
+    }
+
+    function handle_cursor_drop(e) {
+        e.preventDefault();
+        is_dragging_cursor = false;
+        const file = e.dataTransfer?.files?.[0];
+        if (file) load_cursor_file(file);
+    }
+
+    function handle_cursor_drag_over(e) {
+        e.preventDefault();
+        is_dragging_cursor = true;
+    }
+
+    function handle_cursor_drag_leave() {
+        is_dragging_cursor = false;
+    }
+
+    function load_cursor_file(file) {
+        if (!file || !file.type.startsWith('image/')) return;
+        cursor_name = file.name;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            cursor_src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function handle_cursor_file_select(e) {
+        const file = e.target.files?.[0];
+        if (file) load_cursor_file(file);
+    }
+
+    function handle_begin() {
+        if (!image_src) return;
+        started = true;
     }
 
     function handle_file_select(e) {
@@ -248,12 +290,14 @@
     });
 </script>
 
-{#if !image_src}
-    <!-- ── Drop Zone ──────────────────────────────── -->
+{#if !started}
+    <!-- ── Landing ─────────────────────────────────── -->
     <div class="drop-zone-wrapper">
+        <!-- Main image drop zone -->
         <div
             class="drop-zone"
             class:dragging={is_dragging}
+            class:done={image_src}
             role="button"
             tabindex="0"
             ondrop={handle_drop}
@@ -263,10 +307,15 @@
             <div class="drop-zone__icon">
                 <ImageUp size={48} strokeWidth={1.5} />
             </div>
-            <p class="drop-zone__title">Drop your image here</p>
-            <p class="drop-zone__subtitle">or</p>
+            {#if image_src}
+                <p class="drop-zone__title">{file_name}</p>
+                <p class="drop-zone__subtitle">Main image selected ✓</p>
+            {:else}
+                <p class="drop-zone__title">Drop your image here</p>
+                <p class="drop-zone__subtitle">or</p>
+            {/if}
             <label class="drop-zone__btn">
-                Browse files
+                {image_src ? 'Change file' : 'Browse files'}
                 <input
                     type="file"
                     accept="image/*"
@@ -275,6 +324,47 @@
             </label>
             <p class="drop-zone__hint">PNG, JPG, SVG, WebP</p>
         </div>
+
+        <!-- Custom cursor drop zone -->
+        <div
+            class="drop-zone drop-zone--small"
+            class:dragging={is_dragging_cursor}
+            class:done={cursor_src}
+            role="button"
+            tabindex="0"
+            ondrop={handle_cursor_drop}
+            ondragover={handle_cursor_drag_over}
+            ondragleave={handle_cursor_drag_leave}
+        >
+            <div class="drop-zone__icon">
+                <MousePointer2 size={32} strokeWidth={1.5} />
+            </div>
+            {#if cursor_src}
+                <p class="drop-zone__title drop-zone__title--sm">{cursor_name}</p>
+                <p class="drop-zone__subtitle">Custom image selected ✓</p>
+            {:else}
+                <p class="drop-zone__subtitle">You can use a custom image to match elements in your main image or as a custom cursor. It will be resized proportionally to the main image.</p>
+                <p class="drop-zone__title drop-zone__title--sm">Drop your image here</p>
+                <p class="drop-zone__subtitle">or</p>
+            {/if}
+            <label class="drop-zone__btn drop-zone__btn--secondary">
+                {cursor_src ? 'Change file' : 'Browse files'}
+                <input
+                    type="file"
+                    accept="image/*"
+                    onchange={handle_cursor_file_select}
+                />
+            </label>
+        </div>
+
+        <!-- Begin button -->
+        <button
+            class="begin-btn"
+            class:disabled={!image_src}
+            onclick={handle_begin}
+        >
+            Begin
+        </button>
     </div>
 {:else}
     <!-- ── Workspace ──────────────────────────────── -->
@@ -418,8 +508,10 @@
         width: 100vw;
         height: 100vh;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: 1.5rem;
         padding: 2rem;
     }
 
@@ -449,6 +541,16 @@
                     inset 0 0 40px var(--clr-accent-glow);
     }
 
+    .drop-zone.done {
+        border-color: #3a7;
+        border-style: solid;
+    }
+
+    .drop-zone--small {
+        padding: 1.8rem 2rem;
+        max-width: 34rem;
+    }
+
     .drop-zone__icon {
         color: var(--clr-text-dim);
         margin-bottom: 0.5rem;
@@ -467,10 +569,16 @@
         color: var(--clr-text);
     }
 
+    .drop-zone__title--sm {
+        font-size: 0.95rem;
+    }
+
     .drop-zone__subtitle {
         margin: 0;
         font-size: 0.85rem;
         color: var(--clr-text-dim);
+        text-align: center;
+        line-height: 1.5;
     }
 
     .drop-zone__btn {
@@ -511,6 +619,44 @@
         font-size: 0.75rem;
         color: var(--clr-text-dim);
         letter-spacing: 0.04em;
+    }
+
+    .drop-zone__btn--secondary {
+        background: transparent;
+        border: 1px solid var(--clr-border);
+        color: var(--clr-text-dim);
+    }
+
+    .drop-zone__btn--secondary:hover {
+        border-color: var(--clr-accent);
+        color: var(--clr-text);
+    }
+
+    /* ── Begin Button ────────────────────────────── */
+    .begin-btn {
+        padding: 0.75rem 3rem;
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #fff;
+        background: linear-gradient(135deg, var(--clr-accent), #8b6cff);
+        border: none;
+        border-radius: 0.7rem;
+        cursor: pointer;
+        transition: filter 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
+    }
+
+    .begin-btn:hover {
+        filter: brightness(1.1);
+        transform: translateY(-2px);
+    }
+
+    .begin-btn:active {
+        transform: translateY(0);
+    }
+
+    .begin-btn.disabled {
+        opacity: 0.35;
+        pointer-events: none;
     }
 
     /* ── Workspace ────────────────────────────────── */
