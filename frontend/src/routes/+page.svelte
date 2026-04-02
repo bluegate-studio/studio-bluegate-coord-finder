@@ -272,12 +272,62 @@
         hover_y = Math.round(cy);
         rendered_content_w = content_w;
         rendered_content_h = content_h;
+
+        check_edge_pan(e);
     }
 
     function handle_mouse_leave() {
         if (has_overlay) return;
         hover_x = null;
         hover_y = null;
+        stop_edge_pan();
+    }
+
+    /* ── Edge-pan (no-overlay, zoomed in) ────────── */
+    const EDGE_ZONE = 50;    // px from canvas border
+    const EDGE_SPEED = 12;   // max px/frame at deepest edge
+    let edge_pan_raf = null;
+    let edge_dx = 0;
+    let edge_dy = 0;
+
+    function check_edge_pan(e) {
+        if (has_overlay || zoom <= 1 || !canvas_el) return stop_edge_pan();
+
+        const rect = canvas_el.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const w = rect.width;
+        const h = rect.height;
+
+        edge_dx = 0;
+        edge_dy = 0;
+
+        if (mx < EDGE_ZONE) edge_dx = EDGE_SPEED * (1 - mx / EDGE_ZONE);
+        else if (mx > w - EDGE_ZONE) edge_dx = -EDGE_SPEED * (1 - (w - mx) / EDGE_ZONE);
+
+        if (my < EDGE_ZONE) edge_dy = EDGE_SPEED * (1 - my / EDGE_ZONE);
+        else if (my > h - EDGE_ZONE) edge_dy = -EDGE_SPEED * (1 - (h - my) / EDGE_ZONE);
+
+        if (edge_dx !== 0 || edge_dy !== 0) {
+            if (!edge_pan_raf) edge_pan_raf = requestAnimationFrame(edge_pan_tick);
+        } else {
+            stop_edge_pan();
+        }
+    }
+
+    function edge_pan_tick() {
+        manual_pan_x += edge_dx;
+        manual_pan_y += edge_dy;
+        edge_pan_raf = requestAnimationFrame(edge_pan_tick);
+    }
+
+    function stop_edge_pan() {
+        if (edge_pan_raf) {
+            cancelAnimationFrame(edge_pan_raf);
+            edge_pan_raf = null;
+        }
+        edge_dx = 0;
+        edge_dy = 0;
     }
 
     function handle_click() {
@@ -542,29 +592,6 @@
         zoom = new_zoom;
     }
 
-    function handle_canvas_keydown(e) {
-        if (has_overlay) return; // overlay handles its own keys
-        const step = e.shiftKey ? 100 : 10;
-
-        switch (e.key) {
-            case 'ArrowLeft':
-                e.preventDefault();
-                manual_pan_x += step;
-                break;
-            case 'ArrowRight':
-                e.preventDefault();
-                manual_pan_x -= step;
-                break;
-            case 'ArrowUp':
-                e.preventDefault();
-                manual_pan_y += step;
-                break;
-            case 'ArrowDown':
-                e.preventDefault();
-                manual_pan_y -= step;
-                break;
-        }
-    }
 
     function handle_canvas_dblclick() {
         zoom = 1;
@@ -697,7 +724,6 @@
             bind:this={canvas_el}
             tabindex="0"
             onwheel={handle_wheel}
-            onkeydown={handle_canvas_keydown}
             ondblclick={handle_canvas_dblclick}
         >
             <div
