@@ -257,15 +257,38 @@
                     </button>
                 </div>
 
-                {#each saved_coords as coord, i}
-                    <div class="coord-row">
-                        <span class="coord-row__index">{i + 1}.</span>
-                        <span class="coord-row__value">x: {coord.x} y: {coord.y} | x: {coord.rx} y: {coord.ry}</span>
-                        <button class="coord-row__delete" title="Remove">
-                            <Trash2 size={13} strokeWidth={2} />
-                        </button>
-                    </div>
-                {/each}
+                <table class="coord-table">
+                    <thead>
+                        <tr>
+                            <th class="coord-table__th" rowspan="2">#</th>
+                            <th class="coord-table__th coord-table__th--group" colspan="2">Resized</th>
+                            <th class="coord-table__th coord-table__th--group" colspan="2">Real</th>
+                            <th class="coord-table__th" rowspan="2"></th>
+                        </tr>
+                        <tr>
+                            <th class="coord-table__th">X</th>
+                            <th class="coord-table__th">Y</th>
+                            <th class="coord-table__th">X</th>
+                            <th class="coord-table__th">Y</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {#each saved_coords as coord, i}
+                            <tr class="coord-table__row">
+                                <td class="coord-table__td coord-table__td--index">{i + 1}</td>
+                                <td class="coord-table__td">{coord.x}</td>
+                                <td class="coord-table__td">{coord.y}</td>
+                                <td class="coord-table__td">{coord.rx}</td>
+                                <td class="coord-table__td">{coord.ry}</td>
+                                <td class="coord-table__td coord-table__td--action">
+                                    <button class="coord-table__delete" title="Remove">
+                                        <Trash2 size={13} strokeWidth={2} />
+                                    </button>
+                                </td>
+                            </tr>
+                        {/each}
+                    </tbody>
+                </table>
             </div>
         </aside>
     </div>
@@ -402,7 +425,7 @@
 
     /* ── Sidebar ──────────────────────────────────── */
     .workspace__sidebar {
-        width: 16rem;
+        width: 20rem;
         flex-shrink: 0;
         height: 90vh;
         overflow-y: auto;
@@ -482,36 +505,51 @@
         white-space: nowrap;
     }
 
-    /* ── Coord Rows ──────────────────────────────── */
-    .coord-row {
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-        padding: 0.4rem 0;
-        border-bottom: 1px solid #ececf0;
-        font-size: 0.75rem;
-    }
-
-    .coord-row:last-child {
-        border-bottom: none;
-    }
-
-    .coord-row__index {
-        flex-shrink: 0;
-        width: 1.4rem;
-        font-weight: 600;
-        color: #999;
-    }
-
-    .coord-row__value {
-        flex: 1;
-        min-width: 0;
-        color: #1a1a1f;
+    /* ── Coord Table ─────────────────────────────── */
+    .coord-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.72rem;
         font-variant-numeric: tabular-nums;
     }
 
-    .coord-row__delete {
-        flex-shrink: 0;
+    .coord-table__th {
+        padding: 0.3rem 0.35rem;
+        font-weight: 600;
+        color: #999;
+        text-align: center;
+        border-bottom: 1px solid #dcdce0;
+        font-size: 0.65rem;
+        letter-spacing: 0.03em;
+    }
+
+    .coord-table__th--group {
+        border-bottom: 1px solid #ccc;
+    }
+
+    .coord-table__row:hover {
+        background: #eaeaef;
+    }
+
+    .coord-table__td {
+        padding: 0.3rem 0.35rem;
+        text-align: center;
+        color: #1a1a1f;
+        border-bottom: 1px solid #f0f0f3;
+    }
+
+    .coord-table__td--index {
+        font-weight: 600;
+        color: #999;
+        width: 1.6rem;
+    }
+
+    .coord-table__td--action {
+        width: 1.6rem;
+        padding: 0.2rem;
+    }
+
+    .coord-table__delete {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -526,7 +564,7 @@
         transition: color 0.15s ease, background 0.15s ease;
     }
 
-    .coord-row__delete:hover {
+    .coord-table__delete:hover {
         color: #e44;
         background: rgba(228, 68, 68, 0.08);
     }
