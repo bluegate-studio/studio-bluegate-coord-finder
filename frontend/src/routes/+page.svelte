@@ -281,8 +281,9 @@
     }
 
     function handle_click() {
-        if (has_overlay) return; // in overlay mode, only overlay saves
+        if (has_overlay) return;
         if (hover_x === null || real_hover_x === null) return;
+        if (is_duplicate_of_last(real_hover_x, real_hover_y)) return;
         saved_coords.push({
             x: hover_x,
             y: hover_y,
@@ -363,7 +364,14 @@
         }
     }
 
+    function is_duplicate_of_last(rx, ry) {
+        if (!saved_coords.length) return false;
+        const last = saved_coords[saved_coords.length - 1];
+        return last.rx === rx && last.ry === ry;
+    }
+
     function save_overlay_coords() {
+        if (is_duplicate_of_last(cursor_real_center_x, cursor_real_center_y)) return;
         saved_coords.push({
             x: cursor_center_x,
             y: cursor_center_y,
