@@ -99,7 +99,7 @@
     let pan_x = $derived(has_overlay && zoom > 1 ? compute_auto_pan_x() : manual_pan_x);
     let pan_y = $derived(has_overlay && zoom > 1 ? compute_auto_pan_y() : manual_pan_y);
 
-    let zoom_display = $derived(zoom.toFixed(1) + '×');
+    let zoom_display = $derived(Math.round(zoom).toString());
 
     /** @type {Array<{x: number, y: number, rx: number, ry: number}>} */
     let saved_coords = $state([]);
@@ -768,7 +768,18 @@
                     <span class="info-row__label">Zoom</span>
                     <span class="info-row__value info-row__value--zoom">
                         <button class="zoom-btn" title="Zoom out" onclick={zoom_out_sidebar}><Minus size={12} strokeWidth={2.5} /></button>
-                        <span>{zoom_display}</span>
+                        <input
+                            class="zoom-input"
+                            type="number"
+                            min="1"
+                            max="20"
+                            value={zoom_display}
+                            onchange={(e) => {
+                                const v = parseInt(e.target.value);
+                                if (v >= 1 && v <= 20) zoom = v;
+                                else e.target.value = zoom_display;
+                            }}
+                        />
                         <button class="zoom-btn" title="Zoom in" onclick={zoom_in_sidebar}><Plus size={12} strokeWidth={2.5} /></button>
                     </span>
                 </div>
@@ -1107,6 +1118,30 @@
         color: var(--clr-accent);
     }
 
+    .zoom-input {
+        width: 2.5rem;
+        height: 1.4rem;
+        padding: 0 0.2rem;
+        border: 1px solid var(--clr-border);
+        border-radius: 0.3rem;
+        background: #fff;
+        color: #000;
+        font-size: 0.72rem;
+        font-family: inherit;
+        text-align: center;
+        -moz-appearance: textfield;
+    }
+
+    .zoom-input::-webkit-inner-spin-button,
+    .zoom-input::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .zoom-input:focus {
+        outline: none;
+        border-color: var(--clr-accent);
+    }
     /* ── Sidebar ──────────────────────────────────── */
     .workspace__sidebar {
         width: 20rem;
