@@ -385,7 +385,12 @@
         return img_el.offsetTop + rect.offset_y + cursor_pos_y * scale_factor;
     }
 
-    /* ── Delete confirmation ──────────────────────── */
+    /* ── Delete ───────────────────────────────────── */
+    function direct_delete(i) {
+        saved_coords.splice(i, 1);
+    }
+
+    /* ── Delete confirmation (commented out — may re-activate via settings) ──
     let delete_index = $state(null);
     let show_delete_modal = $derived(delete_index !== null);
 
@@ -413,7 +418,7 @@
         }
     }
 
-    /** @type {HTMLDivElement|null} */
+    // @type {HTMLDivElement|null}
     let veil_el = $state(null);
 
     $effect(() => {
@@ -421,6 +426,7 @@
             veil_el.focus();
         }
     });
+    */
 
     /* ── Copy to clipboard ───────────────────────── */
     let show_copy_modal = $state(false);
@@ -549,7 +555,7 @@
     }
 
     function handle_body_keydown(e) {
-        if (show_delete_modal || show_copy_modal) return;
+        if (show_copy_modal) return;
         if (has_overlay) {
             const step = e.ctrlKey && e.shiftKey ? 100 : e.shiftKey ? 10 : 1;
             switch (e.key) {
@@ -787,7 +793,7 @@
                                 <td class="coord-table__td">{coord.rx}</td>
                                 <td class="coord-table__td">{coord.ry}</td>
                                 <td class="coord-table__td coord-table__td--action">
-                                    <button class="coord-table__delete" title="Remove" onclick={() => request_delete(i)}>
+                                    <button class="coord-table__delete" title="Remove" onclick={() => direct_delete(i)}>
                                         <Trash2 size={13} strokeWidth={2} />
                                     </button>
                                 </td>
@@ -800,8 +806,8 @@
     </div>
 {/if}
 
+<!-- Delete confirmation modal (commented out — may re-activate via settings)
 {#if show_delete_modal}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         class="modal-veil"
         bind:this={veil_el}
@@ -809,8 +815,6 @@
         onclick={cancel_delete}
         onkeyup={handle_modal_keyup}
     >
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="modal-dialog" onclick={(e) => e.stopPropagation()}>
             <p class="modal-dialog__title">Delete coordinate #{delete_index + 1}?</p>
             <p class="modal-dialog__text">This action cannot be undone.</p>
@@ -821,6 +825,7 @@
         </div>
     </div>
 {/if}
+-->
 
 {#if show_copy_modal}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
