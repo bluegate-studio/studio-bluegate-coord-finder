@@ -316,13 +316,15 @@
     }
 
     function do_overlay_drag(e) {
-        cursor_pos_x = Math.round(drag_start_pos_x + (e.clientX - drag_start_mouse_x) / (zoom * scale_factor));
-        cursor_pos_y = Math.round(drag_start_pos_y + (e.clientY - drag_start_mouse_y) / (zoom * scale_factor));
+        cursor_pos_x = drag_start_pos_x + (e.clientX - drag_start_mouse_x) / scale_factor;
+        cursor_pos_y = drag_start_pos_y + (e.clientY - drag_start_mouse_y) / scale_factor;
         clamp_cursor();
     }
 
     function end_overlay_drag() {
         is_overlay_dragging = false;
+        cursor_pos_x = Math.round(cursor_pos_x);
+        cursor_pos_y = Math.round(cursor_pos_y);
         document.removeEventListener('mousemove', do_overlay_drag);
         document.removeEventListener('mouseup', end_overlay_drag);
     }
