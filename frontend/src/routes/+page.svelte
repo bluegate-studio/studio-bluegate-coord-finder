@@ -38,19 +38,21 @@
     let rendered_content_w = $state(0);
     let rendered_content_h = $state(0);
 
-    /* ── Custom cursor overlay state ──────────────── */
+    /* ── Custom cursor overlay state (real-pixel-integer space) ── */
     let cursor_natural_w = $state(0);
     let cursor_natural_h = $state(0);
-    let cursor_pos_x = $state(0);
-    let cursor_pos_y = $state(0);
+    let cursor_pos_x = $state(0); // real-pixel X (top-left of overlay)
+    let cursor_pos_y = $state(0); // real-pixel Y (top-left of overlay)
 
     let scale_factor = $derived(rendered_content_w > 0 ? rendered_content_w / natural_w : 1);
     let cursor_display_w = $derived(cursor_natural_w * scale_factor);
     let cursor_display_h = $derived(cursor_natural_h * scale_factor);
-    let cursor_center_x = $derived(Math.round(cursor_pos_x + cursor_display_w / 2));
-    let cursor_center_y = $derived(Math.round(cursor_pos_y + cursor_display_h / 2));
-    let cursor_real_center_x = $derived(scale_factor > 0 ? Math.round(cursor_center_x / scale_factor) : 0);
-    let cursor_real_center_y = $derived(scale_factor > 0 ? Math.round(cursor_center_y / scale_factor) : 0);
+    // Real center — exact integers, no rounding
+    let cursor_real_center_x = $derived(cursor_pos_x + Math.round(cursor_natural_w / 2));
+    let cursor_real_center_y = $derived(cursor_pos_y + Math.round(cursor_natural_h / 2));
+    // Rendered center — derived from real, for display only
+    let cursor_center_x = $derived(Math.round(cursor_real_center_x * scale_factor));
+    let cursor_center_y = $derived(Math.round(cursor_real_center_y * scale_factor));
 
     let has_overlay = $derived(!!cursor_src && cursor_natural_w > 0);
 
@@ -81,7 +83,7 @@
         if (!img_el || !canvas_el) return 0;
         const rect = get_content_rect();
         if (!rect) return 0;
-        const center_in_wrapper = img_el.offsetLeft + rect.offset_x + cursor_pos_x + cursor_display_w / 2;
+        const center_in_wrapper = img_el.offsetLeft + rect.offset_x + cursor_pos_x * scale_factor + cursor_display_w / 2;
         return (canvas_el.clientWidth / 2) - center_in_wrapper * zoom;
     }
 
@@ -89,7 +91,7 @@
         if (!img_el || !canvas_el) return 0;
         const rect = get_content_rect();
         if (!rect) return 0;
-        const center_in_wrapper = img_el.offsetTop + rect.offset_y + cursor_pos_y + cursor_display_h / 2;
+        const center_in_wrapper = img_el.offsetTop + rect.offset_y + cursor_pos_y * scale_factor + cursor_display_h / 2;
         return (canvas_el.clientHeight / 2) - center_in_wrapper * zoom;
     }
 
@@ -201,17 +203,8 @@
         // Keep content dimensions in sync for overlay positioning
         const rect = get_content_rect();
         if (rect) {
-            const old_cw = rendered_content_w;
-            const old_ch = rendered_content_h;
-
             rendered_content_w = rect.content_w;
             rendered_content_h = rect.content_h;
-
-            // Rescale cursor position proportionally on resize
-            if (cursor_src && old_cw > 0 && old_ch > 0) {
-                cursor_pos_x *= rect.content_w / old_cw;
-                cursor_pos_y *= rect.content_h / old_ch;
-            }
 
             // Deferred centering (cursor loaded before workspace rendered)
             if (cursor_needs_centering && cursor_natural_w > 0) {
@@ -222,11 +215,8 @@
     }
 
     function center_cursor_overlay() {
-        const sf = rendered_content_w > 0 ? rendered_content_w / natural_w : 1;
-        const dw = cursor_natural_w * sf;
-        const dh = cursor_natural_h * sf;
-        cursor_pos_x = (rendered_content_w - dw) / 2;
-        cursor_pos_y = (rendered_content_h - dh) / 2;
+        cursor_pos_x = Math.round((natural_w - cursor_natural_w) / 2);
+        cursor_pos_y = Math.round((natural_h - cursor_natural_h) / 2);
     }
 
     /**
@@ -308,8 +298,8 @@
     let drag_start_pos_y = 0;
 
     function clamp_cursor() {
-        const max_x = rendered_content_w - cursor_display_w;
-        const max_y = rendered_content_h - cursor_display_h;
+        const max_x = natural_w - cursor_natural_w;
+        const max_y = natural_h - cursor_natural_h;
         cursor_pos_x = Math.max(0, Math.min(max_x, cursor_pos_x));
         cursor_pos_y = Math.max(0, Math.min(max_y, cursor_pos_y));
     }
@@ -326,8 +316,8 @@
     }
 
     function do_overlay_drag(e) {
-        cursor_pos_x = drag_start_pos_x + (e.clientX - drag_start_mouse_x) / zoom;
-        cursor_pos_y = drag_start_pos_y + (e.clientY - drag_start_mouse_y) / zoom;
+        cursor_pos_x = Math.round(drag_start_pos_x + (e.clientX - drag_start_mouse_x) / (zoom * scale_factor));
+        cursor_pos_y = Math.round(drag_start_pos_y + (e.clientY - drag_start_mouse_y) / (zoom * scale_factor));
         clamp_cursor();
     }
 
@@ -385,14 +375,14 @@
         if (!img_el) return 0;
         const rect = get_content_rect();
         if (!rect) return 0;
-        return img_el.offsetLeft + rect.offset_x + cursor_pos_x;
+        return img_el.offsetLeft + rect.offset_x + cursor_pos_x * scale_factor;
     }
 
     function get_overlay_top() {
         if (!img_el) return 0;
         const rect = get_content_rect();
         if (!rect) return 0;
-        return img_el.offsetTop + rect.offset_y + cursor_pos_y;
+        return img_el.offsetTop + rect.offset_y + cursor_pos_y * scale_factor;
     }
 
     /* ── Delete confirmation ──────────────────────── */
