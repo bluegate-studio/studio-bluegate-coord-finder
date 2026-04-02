@@ -1,4 +1,5 @@
 <script>
+    import { tick } from 'svelte';
     import { ImageUp, ClipboardCopy, Trash2, MousePointer2, Minus, Plus } from '@lucide/svelte';
 
     let image_src = $state(null);
@@ -288,6 +289,7 @@
             rx: real_hover_x,
             ry: real_hover_y,
         });
+        setTimeout(scroll_to_last_coord, 0);
     }
 
     /* ── Overlay drag ─────────────────────────────── */
@@ -368,6 +370,12 @@
             rx: cursor_real_center_x,
             ry: cursor_real_center_y,
         });
+        setTimeout(scroll_to_last_coord, 0);
+    }
+
+    function scroll_to_last_coord() {
+        const section = document.querySelector('.sidebar-section--grow');
+        if (section) section.scrollTop = section.scrollHeight;
     }
 
     /**
@@ -1096,7 +1104,6 @@
         width: 20rem;
         flex-shrink: 0;
         height: 90vh;
-        overflow-y: auto;
         display: flex;
         flex-direction: column;
         gap: 1rem;
