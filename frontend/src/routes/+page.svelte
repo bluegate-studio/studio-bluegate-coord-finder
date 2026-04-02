@@ -193,6 +193,44 @@
         }
     });
 
+    /* ── Copy to clipboard ───────────────────────── */
+    let show_copy_modal = $state(false);
+
+    async function handle_copy() {
+        if (!saved_coords.length) return;
+
+        const payload = {
+            real: saved_coords.map(c => ({ x: c.rx, y: c.ry })),
+            resized: saved_coords.map(c => ({ x: c.x, y: c.y })),
+        };
+
+        try {
+            await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+            show_copy_modal = true;
+        } catch (_) {
+            /* clipboard access denied — fail silently */
+        }
+    }
+
+    function dismiss_copy_modal() {
+        show_copy_modal = false;
+    }
+
+    function handle_copy_modal_keyup(e) {
+        if (e.key === 'Enter' || e.key === 'Escape') {
+            dismiss_copy_modal();
+        }
+    }
+
+    /** @type {HTMLDivElement|null} */
+    let copy_veil_el = $state(null);
+
+    $effect(() => {
+        if (show_copy_modal && copy_veil_el) {
+            copy_veil_el.focus();
+        }
+    });
+
     let resize_timer;
     function measure_rendered_debounced() {
         clearTimeout(resize_timer);
@@ -289,7 +327,7 @@
             <div class="sidebar-section sidebar-section--grow">
                 <div class="sidebar-section__header">
                     <h3 class="sidebar-section__title">Saved Coordinates</h3>
-                    <button class="sidebar-section__action" title="Copy to clipboard">
+                    <button class="sidebar-section__action" title="Copy to clipboard" onclick={handle_copy}>
                         <ClipboardCopy size={14} strokeWidth={2} />
                     </button>
                 </div>
@@ -348,6 +386,27 @@
             <div class="modal-dialog__actions">
                 <button class="modal-dialog__btn modal-dialog__btn--cancel" onclick={cancel_delete}>Cancel</button>
                 <button class="modal-dialog__btn modal-dialog__btn--delete" onclick={confirm_delete}>Delete</button>
+            </div>
+        </div>
+    </div>
+{/if}
+
+{#if show_copy_modal}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+        class="modal-veil"
+        bind:this={copy_veil_el}
+        tabindex="-1"
+        onclick={dismiss_copy_modal}
+        onkeyup={handle_copy_modal_keyup}
+    >
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="modal-dialog" onclick={(e) => e.stopPropagation()}>
+            <p class="modal-dialog__title">Copied to clipboard</p>
+            <p class="modal-dialog__text">All {saved_coords.length} saved coordinates are in your clipboard as JSON, ready to paste.</p>
+            <div class="modal-dialog__actions">
+                <button class="modal-dialog__btn modal-dialog__btn--ok" onclick={dismiss_copy_modal}>OK</button>
             </div>
         </div>
     </div>
@@ -690,6 +749,11 @@
 
     .modal-dialog__btn--delete {
         background: #e44;
+        color: #fff;
+    }
+
+    .modal-dialog__btn--ok {
+        background: var(--clr-accent);
         color: #fff;
     }
 </style>
