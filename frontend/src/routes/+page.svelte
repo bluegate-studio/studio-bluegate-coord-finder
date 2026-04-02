@@ -156,6 +156,43 @@
         });
     }
 
+    /* ── Delete confirmation ──────────────────────── */
+    let delete_index = $state(null);
+    let show_delete_modal = $derived(delete_index !== null);
+
+    function request_delete(i) {
+        delete_index = i;
+    }
+
+    function confirm_delete() {
+        if (delete_index !== null) {
+            saved_coords.splice(delete_index, 1);
+        }
+        delete_index = null;
+    }
+
+    function cancel_delete() {
+        delete_index = null;
+    }
+
+    function handle_modal_keyup(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            confirm_delete();
+        } else if (e.key === 'Escape') {
+            cancel_delete();
+        }
+    }
+
+    /** @type {HTMLDivElement|null} */
+    let veil_el = $state(null);
+
+    $effect(() => {
+        if (show_delete_modal && veil_el) {
+            veil_el.focus();
+        }
+    });
+
     let resize_timer;
     function measure_rendered_debounced() {
         clearTimeout(resize_timer);
@@ -281,7 +318,7 @@
                                 <td class="coord-table__td">{coord.rx}</td>
                                 <td class="coord-table__td">{coord.ry}</td>
                                 <td class="coord-table__td coord-table__td--action">
-                                    <button class="coord-table__delete" title="Remove">
+                                    <button class="coord-table__delete" title="Remove" onclick={() => request_delete(i)}>
                                         <Trash2 size={13} strokeWidth={2} />
                                     </button>
                                 </td>
@@ -291,6 +328,28 @@
                 </table>
             </div>
         </aside>
+    </div>
+{/if}
+
+{#if show_delete_modal}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+        class="modal-veil"
+        bind:this={veil_el}
+        tabindex="-1"
+        onclick={cancel_delete}
+        onkeyup={handle_modal_keyup}
+    >
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="modal-dialog" onclick={(e) => e.stopPropagation()}>
+            <p class="modal-dialog__title">Delete coordinate #{delete_index + 1}?</p>
+            <p class="modal-dialog__text">This action cannot be undone.</p>
+            <div class="modal-dialog__actions">
+                <button class="modal-dialog__btn modal-dialog__btn--cancel" onclick={cancel_delete}>Cancel</button>
+                <button class="modal-dialog__btn modal-dialog__btn--delete" onclick={confirm_delete}>Delete</button>
+            </div>
+        </div>
     </div>
 {/if}
 
@@ -420,7 +479,7 @@
         max-height: 100%;
         object-fit: contain;
         object-position: 50% 0%;
-        cursor: crosshair;
+        cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cline x1='16' y1='0' x2='16' y2='32' stroke='%23fff' stroke-width='1.5'/%3E%3Cline x1='0' y1='16' x2='32' y2='16' stroke='%23fff' stroke-width='1.5'/%3E%3Cline x1='16' y1='0' x2='16' y2='32' stroke='%23000' stroke-width='0.75'/%3E%3Cline x1='0' y1='16' x2='32' y2='16' stroke='%23000' stroke-width='0.75'/%3E%3C/svg%3E") 16 16, crosshair;
     }
 
     /* ── Sidebar ──────────────────────────────────── */
@@ -567,5 +626,70 @@
     .coord-table__delete:hover {
         color: #e44;
         background: rgba(228, 68, 68, 0.08);
+    }
+
+    /* ── Modal ────────────────────────────────────── */
+    .modal-veil {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(4px) saturate(0.4);
+        -webkit-backdrop-filter: blur(4px) saturate(0.4);
+    }
+
+    .modal-dialog {
+        background: #fff;
+        border-radius: 0.85rem;
+        padding: 1.6rem 1.8rem;
+        width: 100%;
+        max-width: 20rem;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    }
+
+    .modal-dialog__title {
+        margin: 0 0 0.35rem;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1a1a1f;
+    }
+
+    .modal-dialog__text {
+        margin: 0 0 1.2rem;
+        font-size: 0.8rem;
+        color: #888;
+    }
+
+    .modal-dialog__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+
+    .modal-dialog__btn {
+        padding: 0.45rem 1rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+        border: none;
+        border-radius: 0.45rem;
+        cursor: pointer;
+        transition: filter 0.15s ease;
+    }
+
+    .modal-dialog__btn:hover {
+        filter: brightness(0.92);
+    }
+
+    .modal-dialog__btn--cancel {
+        background: #ececf0;
+        color: #444;
+    }
+
+    .modal-dialog__btn--delete {
+        background: #e44;
+        color: #fff;
     }
 </style>
