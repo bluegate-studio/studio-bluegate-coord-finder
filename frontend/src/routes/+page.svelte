@@ -307,6 +307,13 @@
     let drag_start_pos_x = 0;
     let drag_start_pos_y = 0;
 
+    function clamp_cursor() {
+        const max_x = rendered_content_w - cursor_display_w;
+        const max_y = rendered_content_h - cursor_display_h;
+        cursor_pos_x = Math.max(0, Math.min(max_x, cursor_pos_x));
+        cursor_pos_y = Math.max(0, Math.min(max_y, cursor_pos_y));
+    }
+
     function start_overlay_drag(e) {
         e.preventDefault();
         is_overlay_dragging = true;
@@ -321,6 +328,7 @@
     function do_overlay_drag(e) {
         cursor_pos_x = drag_start_pos_x + (e.clientX - drag_start_mouse_x) / zoom;
         cursor_pos_y = drag_start_pos_y + (e.clientY - drag_start_mouse_y) / zoom;
+        clamp_cursor();
     }
 
     function end_overlay_drag() {
@@ -581,6 +589,7 @@
                     save_overlay_coords();
                     break;
             }
+            clamp_cursor();
         }
     }
 </script>
