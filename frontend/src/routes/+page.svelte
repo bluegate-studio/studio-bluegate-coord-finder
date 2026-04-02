@@ -1,5 +1,5 @@
 <script>
-    import { ImageUp, ClipboardCopy, Trash2, MousePointer2 } from '@lucide/svelte';
+    import { ImageUp, ClipboardCopy, Trash2, MousePointer2, Minus, Plus } from '@lucide/svelte';
 
     let image_src = $state(null);
     let file_name = $state('');
@@ -10,6 +10,7 @@
     let cursor_src = $state(null);
     let cursor_name = $state('');
     let is_dragging_cursor = $state(false);
+    let cursor_needs_centering = false;
 
     let natural_w = $state(0);
     let natural_h = $state(0);
@@ -63,6 +64,39 @@
 
     /** @type {HTMLImageElement|null} */
     let img_el = $state(null);
+
+    /** @type {HTMLDivElement|null} */
+    let canvas_el = $state(null);
+
+    /* ── Zoom & Pan ─────────────────────────────── */
+    let zoom = $state(1);
+    let manual_pan_x = $state(0);
+    let manual_pan_y = $state(0);
+
+    function clamp_zoom(v) {
+        return Math.max(1, Math.min(20, v));
+    }
+
+    function compute_auto_pan_x() {
+        if (!img_el || !canvas_el) return 0;
+        const rect = get_content_rect();
+        if (!rect) return 0;
+        const center_in_wrapper = img_el.offsetLeft + rect.offset_x + cursor_pos_x + cursor_display_w / 2;
+        return (canvas_el.clientWidth / 2) - center_in_wrapper * zoom;
+    }
+
+    function compute_auto_pan_y() {
+        if (!img_el || !canvas_el) return 0;
+        const rect = get_content_rect();
+        if (!rect) return 0;
+        const center_in_wrapper = img_el.offsetTop + rect.offset_y + cursor_pos_y + cursor_display_h / 2;
+        return (canvas_el.clientHeight / 2) - center_in_wrapper * zoom;
+    }
+
+    let pan_x = $derived(has_overlay && zoom > 1 ? compute_auto_pan_x() : manual_pan_x);
+    let pan_y = $derived(has_overlay && zoom > 1 ? compute_auto_pan_y() : manual_pan_y);
+
+    let zoom_display = $derived(zoom.toFixed(1) + '×');
 
     /** @type {Array<{x: number, y: number, rx: number, ry: number}>} */
     let saved_coords = $state([]);
@@ -122,8 +156,15 @@
             probe.onload = () => {
                 cursor_natural_w = probe.naturalWidth;
                 cursor_natural_h = probe.naturalHeight;
-                cursor_pos_x = 0;
-                cursor_pos_y = 0;
+                if (rendered_content_w > 0) {
+                    // Workspace already rendered — center now
+                    center_cursor_overlay();
+                } else {
+                    // Workspace not yet rendered — defer
+                    cursor_pos_x = 0;
+                    cursor_pos_y = 0;
+                    cursor_needs_centering = true;
+                }
             };
             probe.src = data_url;
         };
@@ -171,7 +212,21 @@
                 cursor_pos_x *= rect.content_w / old_cw;
                 cursor_pos_y *= rect.content_h / old_ch;
             }
+
+            // Deferred centering (cursor loaded before workspace rendered)
+            if (cursor_needs_centering && cursor_natural_w > 0) {
+                center_cursor_overlay();
+                cursor_needs_centering = false;
+            }
         }
+    }
+
+    function center_cursor_overlay() {
+        const sf = rendered_content_w > 0 ? rendered_content_w / natural_w : 1;
+        const dw = cursor_natural_w * sf;
+        const dh = cursor_natural_h * sf;
+        cursor_pos_x = (rendered_content_w - dw) / 2;
+        cursor_pos_y = (rendered_content_h - dh) / 2;
     }
 
     /**
@@ -206,15 +261,15 @@
     }
 
     function handle_mouse_move(e) {
-        if (has_overlay) return; // overlay mode: sidebar shows overlay center instead
+        if (has_overlay) return;
         const rect_info = get_content_rect();
         if (!rect_info) return;
 
         const { content_w, content_h, offset_x, offset_y } = rect_info;
         const bounds = img_el.getBoundingClientRect();
 
-        const cx = (e.clientX - bounds.left) - offset_x;
-        const cy = (e.clientY - bounds.top) - offset_y;
+        const cx = ((e.clientX - bounds.left) / zoom) - offset_x;
+        const cy = ((e.clientY - bounds.top) / zoom) - offset_y;
 
         if (cx < 0 || cx > content_w || cy < 0 || cy > content_h) {
             hover_x = null;
@@ -264,8 +319,8 @@
     }
 
     function do_overlay_drag(e) {
-        cursor_pos_x = drag_start_pos_x + (e.clientX - drag_start_mouse_x);
-        cursor_pos_y = drag_start_pos_y + (e.clientY - drag_start_mouse_y);
+        cursor_pos_x = drag_start_pos_x + (e.clientX - drag_start_mouse_x) / zoom;
+        cursor_pos_y = drag_start_pos_y + (e.clientY - drag_start_mouse_y) / zoom;
     }
 
     function end_overlay_drag() {
@@ -422,6 +477,78 @@
             ro.disconnect();
         };
     });
+
+    /* ── Zoom handlers ───────────────────────────── */
+    function handle_wheel(e) {
+        e.preventDefault();
+        const factor = e.deltaY > 0 ? 0.9 : 1.1;
+        const new_zoom = clamp_zoom(zoom * factor);
+
+        if (has_overlay) {
+            // Overlay mode: just zoom, pan auto-adjusts to keep overlay centered
+            zoom = new_zoom;
+        } else {
+            // Non-overlay mode: zoom toward cursor position
+            const cr = canvas_el.getBoundingClientRect();
+            const mx = e.clientX - cr.left;
+            const my = e.clientY - cr.top;
+            manual_pan_x = mx - (mx - manual_pan_x) * (new_zoom / zoom);
+            manual_pan_y = my - (my - manual_pan_y) * (new_zoom / zoom);
+            zoom = new_zoom;
+        }
+    }
+
+    function zoom_in_sidebar() {
+        const new_zoom = clamp_zoom(zoom * 1.1);
+        if (!has_overlay && canvas_el) {
+            const cx = canvas_el.clientWidth / 2;
+            const cy = canvas_el.clientHeight / 2;
+            manual_pan_x = cx - (cx - manual_pan_x) * (new_zoom / zoom);
+            manual_pan_y = cy - (cy - manual_pan_y) * (new_zoom / zoom);
+        }
+        zoom = new_zoom;
+    }
+
+    function zoom_out_sidebar() {
+        const new_zoom = clamp_zoom(zoom * 0.9);
+        if (!has_overlay && canvas_el) {
+            const cx = canvas_el.clientWidth / 2;
+            const cy = canvas_el.clientHeight / 2;
+            manual_pan_x = cx - (cx - manual_pan_x) * (new_zoom / zoom);
+            manual_pan_y = cy - (cy - manual_pan_y) * (new_zoom / zoom);
+        }
+        zoom = new_zoom;
+    }
+
+    function handle_canvas_keydown(e) {
+        if (has_overlay) return; // overlay handles its own keys
+        const step = e.shiftKey ? 100 : 10;
+
+        switch (e.key) {
+            case 'ArrowLeft':
+                e.preventDefault();
+                manual_pan_x += step;
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                manual_pan_x -= step;
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                manual_pan_y += step;
+                break;
+            case 'ArrowDown':
+                e.preventDefault();
+                manual_pan_y -= step;
+                break;
+        }
+    }
+
+    function handle_canvas_dblclick() {
+        zoom = 1;
+        manual_pan_x = 0;
+        manual_pan_y = 0;
+    }
 </script>
 
 {#if !started}
@@ -503,40 +630,54 @@
 {:else}
     <!-- ── Workspace ──────────────────────────────── -->
     <div class="workspace">
-        <div class="workspace__canvas">
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <img
-                bind:this={img_el}
-                src={image_src}
-                alt={file_name}
-                loading="eager"
-                decoding="async"
-                role="application"
-                class:has-overlay={has_overlay}
-                onload={handle_image_load}
-                onmousemove={handle_mouse_move}
-                onmouseleave={handle_mouse_leave}
-                onclick={handle_click}
-            />
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <div
+            class="workspace__canvas"
+            bind:this={canvas_el}
+            tabindex="0"
+            onwheel={handle_wheel}
+            onkeydown={handle_canvas_keydown}
+            ondblclick={handle_canvas_dblclick}
+        >
+            <div
+                class="zoom-wrapper"
+                style:transform="translate({pan_x}px, {pan_y}px) scale({zoom})"
+            >
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                <img
+                    bind:this={img_el}
+                    src={image_src}
+                    alt={file_name}
+                    loading="eager"
+                    decoding="async"
+                    role="application"
+                    class:has-overlay={has_overlay}
+                    onload={handle_image_load}
+                    onmousemove={handle_mouse_move}
+                    onmouseleave={handle_mouse_leave}
+                    onclick={handle_click}
+                />
 
-            {#if has_overlay}
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-                <div
-                    class="cursor-overlay"
-                    class:dragging={is_overlay_dragging}
-                    bind:this={overlay_el}
-                    tabindex="0"
-                    style:left="{get_overlay_left()}px"
-                    style:top="{get_overlay_top()}px"
-                    style:width="{cursor_display_w}px"
-                    style:height="{cursor_display_h}px"
-                    style:background-image="url({cursor_src})"
-                    onmousedown={start_overlay_drag}
-                    onkeydown={handle_overlay_keydown}
-                ></div>
-            {/if}
+                {#if has_overlay}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                    <div
+                        class="cursor-overlay"
+                        class:dragging={is_overlay_dragging}
+                        bind:this={overlay_el}
+                        tabindex="0"
+                        style:left="{get_overlay_left()}px"
+                        style:top="{get_overlay_top()}px"
+                        style:width="{cursor_display_w}px"
+                        style:height="{cursor_display_h}px"
+                        style:background-image="url({cursor_src})"
+                        onmousedown={start_overlay_drag}
+                        onkeydown={handle_overlay_keydown}
+                    ></div>
+                {/if}
+            </div>
         </div>
 
         <aside class="workspace__sidebar">
@@ -561,6 +702,15 @@
                 <div class="info-row">
                     <span class="info-row__label">Aspect ratio (h/w)</span>
                     <span class="info-row__value">{aspect_ratio}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-row__label">Zoom</span>
+                    <span class="info-row__value info-row__value--zoom">
+                        <button class="zoom-btn" title="Zoom out" onclick={zoom_out_sidebar}><Minus size={12} strokeWidth={2.5} /></button>
+                        <span>{zoom_display}</span>
+                        <button class="zoom-btn" title="Zoom in" onclick={zoom_in_sidebar}><Plus size={12} strokeWidth={2.5} /></button>
+                    </span>
                 </div>
 
                 <div class="info-row">
@@ -829,15 +979,20 @@
         flex: 1;
         height: 90vh;
         min-width: 0;
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
+        overflow: hidden;
+        outline: none;
+    }
+
+    .zoom-wrapper {
+        width: 100%;
+        height: 100%;
         position: relative;
+        transform-origin: 0 0;
     }
 
     .workspace__canvas img {
-        max-width: 100%;
-        max-height: 100%;
+        width: 100%;
+        height: 100%;
         object-fit: contain;
         object-position: 50% 0%;
         cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cline x1='16' y1='0' x2='16' y2='32' stroke='%23fff' stroke-width='1.5'/%3E%3Cline x1='0' y1='16' x2='32' y2='16' stroke='%23fff' stroke-width='1.5'/%3E%3Cline x1='16' y1='0' x2='16' y2='32' stroke='%23000' stroke-width='0.75'/%3E%3Cline x1='0' y1='16' x2='32' y2='16' stroke='%23000' stroke-width='0.75'/%3E%3C/svg%3E") 16 16, crosshair;
@@ -864,6 +1019,33 @@
 
     .cursor-overlay.dragging {
         cursor: grabbing;
+    }
+
+    /* ── Zoom Buttons ────────────────────────────── */
+    .info-row__value--zoom {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .zoom-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.4rem;
+        height: 1.4rem;
+        padding: 0;
+        border: 1px solid var(--clr-border);
+        border-radius: 0.3rem;
+        background: #fff;
+        color: var(--clr-text-dim);
+        cursor: pointer;
+        transition: border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .zoom-btn:hover {
+        border-color: var(--clr-accent);
+        color: var(--clr-accent);
     }
 
     /* ── Sidebar ──────────────────────────────────── */
