@@ -489,7 +489,7 @@
     /* ── Zoom handlers ───────────────────────────── */
     function handle_wheel(e) {
         e.preventDefault();
-        const factor = e.deltaY > 0 ? 0.9 : 1.1;
+        const factor = e.deltaY > 0 ? 0.97 : 1.03;
         const new_zoom = clamp_zoom(zoom * factor);
 
         if (has_overlay) {
