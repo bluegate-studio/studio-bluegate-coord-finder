@@ -1,0 +1,29 @@
+{
+    "name": "frontend",
+    "private": true,
+    "version": "0.0.1",
+    "type": "module",
+    "scripts": {
+        "dev": "vite dev",
+        "compile": "vite build",
+        "upgrade": "bun update --latest --interactive && rm -rf node_modules && bun install --force"
+    },
+    "dependencies": {
+        "@lucide/svelte": "^1.7.0",
+        "blue-js": "git+https://github.com/bluegate-studio/blue-js.git",
+        "dexie": "^4.4.2",
+        "embla-carousel": "^8.6.0",
+        "embla-carousel-autoplay": "^8.6.0",
+        "embla-carousel-svelte": "^8.6.0",
+        "exceljs": "^4.4.0",
+        "glightbox": "^3.3.1",
+        "svelte-tel-input": "^4.0.2"
+    },
+    "devDependencies": {
+        "@sveltejs/adapter-static": "^3.0.10",
+        "@sveltejs/kit": "^2.55.0",
+        "@sveltejs/vite-plugin-svelte": "^7.0.0",
+        "svelte": "^5.55.1",
+        "vite": "^8.0.3"
+    }
+}
