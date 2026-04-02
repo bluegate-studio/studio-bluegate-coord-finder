@@ -5,6 +5,41 @@
     let file_name = $state('');
     let is_dragging = $state(false);
 
+    let natural_w = $state(0);
+    let natural_h = $state(0);
+    let rendered_w = $state(0);
+    let rendered_h = $state(0);
+
+    let aspect_ratio = $derived(
+        natural_w > 0 ? (natural_h / natural_w).toFixed(4) : '—'
+    );
+
+    let hover_x = $state(null);
+    let hover_y = $state(null);
+
+    let real_hover_x = $derived(
+        hover_x !== null && rendered_w > 0
+            ? Math.round((hover_x / rendered_content_w) * natural_w)
+            : null
+    );
+    let real_hover_y = $derived(
+        hover_y !== null && rendered_h > 0
+            ? Math.round((hover_y / rendered_content_h) * natural_h)
+            : null
+    );
+
+    let rendered_content_w = $state(0);
+    let rendered_content_h = $state(0);
+
+    let hover_display = $derived(
+        hover_x !== null
+            ? `${hover_x}, ${hover_y}  |  ${real_hover_x}, ${real_hover_y}`
+            : '—'
+    );
+
+    /** @type {HTMLImageElement|null} */
+    let img_el = $state(null);
+
     /** @param {File} file */
     function load_file(file) {
         if (!file || !file.type.startsWith('image/')) return;
@@ -37,10 +72,92 @@
         if (file) load_file(file);
     }
 
-    function handle_reset() {
-        image_src = null;
-        file_name = '';
+    function handle_image_load() {
+        if (!img_el) return;
+        natural_w = img_el.naturalWidth;
+        natural_h = img_el.naturalHeight;
+        measure_rendered();
     }
+
+    function measure_rendered() {
+        if (!img_el) return;
+        rendered_w = img_el.clientWidth;
+        rendered_h = img_el.clientHeight;
+    }
+
+    /**
+     * Calculates the actual visible content rect inside the <img> element,
+     * accounting for object-fit: contain + object-position: 50% 0%.
+     */
+    function get_content_rect() {
+        if (!img_el || !natural_w || !natural_h) return null;
+
+        const el_w = img_el.clientWidth;
+        const el_h = img_el.clientHeight;
+        const img_ratio = natural_w / natural_h;
+        const el_ratio = el_w / el_h;
+
+        let content_w, content_h;
+
+        if (img_ratio > el_ratio) {
+            // width-constrained (horizontal dead zones = none, vertical dead zones at bottom)
+            content_w = el_w;
+            content_h = el_w / img_ratio;
+        } else {
+            // height-constrained (vertical dead zones = none, horizontal dead zones on sides)
+            content_h = el_h;
+            content_w = el_h * img_ratio;
+        }
+
+        // object-position: 50% 0% → centered horizontally, top-aligned vertically
+        const offset_x = (el_w - content_w) / 2;
+        const offset_y = 0;
+
+        return { content_w, content_h, offset_x, offset_y };
+    }
+
+    function handle_mouse_move(e) {
+        const rect_info = get_content_rect();
+        if (!rect_info) return;
+
+        const { content_w, content_h, offset_x, offset_y } = rect_info;
+        const bounds = img_el.getBoundingClientRect();
+
+        const cx = (e.clientX - bounds.left) - offset_x;
+        const cy = (e.clientY - bounds.top) - offset_y;
+
+        if (cx < 0 || cx > content_w || cy < 0 || cy > content_h) {
+            hover_x = null;
+            hover_y = null;
+            return;
+        }
+
+        hover_x = Math.round(cx);
+        hover_y = Math.round(cy);
+        rendered_content_w = content_w;
+        rendered_content_h = content_h;
+    }
+
+    function handle_mouse_leave() {
+        hover_x = null;
+        hover_y = null;
+    }
+
+    let resize_timer;
+    function measure_rendered_debounced() {
+        clearTimeout(resize_timer);
+        resize_timer = setTimeout(measure_rendered, 120);
+    }
+
+    $effect(() => {
+        if (!img_el) return;
+        const ro = new ResizeObserver(() => measure_rendered_debounced());
+        ro.observe(img_el);
+        return () => {
+            clearTimeout(resize_timer);
+            ro.disconnect();
+        };
+    });
 </script>
 
 {#if !image_src}
@@ -72,14 +189,51 @@
         </div>
     </div>
 {:else}
-    <!-- ── Image Display ──────────────────────────── -->
-    <div class="image-display">
-        <img
-            src={image_src}
-            alt={file_name}
-            loading="eager"
-            decoding="async"
-        />
+    <!-- ── Workspace ──────────────────────────────── -->
+    <div class="workspace">
+        <div class="workspace__canvas">
+            <img
+                bind:this={img_el}
+                src={image_src}
+                alt={file_name}
+                loading="eager"
+                decoding="async"
+                onload={handle_image_load}
+                onmousemove={handle_mouse_move}
+                onmouseleave={handle_mouse_leave}
+            />
+        </div>
+
+        <aside class="workspace__sidebar">
+            <div class="sidebar-section">
+                <h3 class="sidebar-section__title">Image Info</h3>
+
+                <div class="info-row">
+                    <span class="info-row__label">File</span>
+                    <span class="info-row__value" title={file_name}>{file_name}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-row__label">Real size</span>
+                    <span class="info-row__value">{natural_w} × {natural_h} px</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-row__label">Actual size</span>
+                    <span class="info-row__value">{rendered_w} × {rendered_h} px</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-row__label">Aspect ratio (h/w)</span>
+                    <span class="info-row__value">{aspect_ratio}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-row__label">Hover (X, Y)</span>
+                    <span class="info-row__value">{hover_display}</span>
+                </div>
+            </div>
+        </aside>
     </div>
 {/if}
 
@@ -184,18 +338,81 @@
         letter-spacing: 0.04em;
     }
 
-    /* ── Image Display ───────────────────────────── */
-    .image-display {
+    /* ── Workspace ────────────────────────────────── */
+    .workspace {
         width: 100vw;
         height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
+        gap: 1rem;
+        padding: 5vh 2vw;
     }
 
-    .image-display img {
-        width: 90vw;
+    .workspace__canvas {
+        flex: 1;
         height: 90vh;
+        min-width: 0;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+    }
+
+    .workspace__canvas img {
+        max-width: 100%;
+        max-height: 100%;
         object-fit: contain;
+        object-position: 50% 0%;
+        cursor: crosshair;
+    }
+
+    /* ── Sidebar ──────────────────────────────────── */
+    .workspace__sidebar {
+        width: 16rem;
+        flex-shrink: 0;
+        height: 90vh;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .sidebar-section {
+        background: #f2f2f5;
+        border: 1px solid #dcdce0;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+
+    .sidebar-section__title {
+        margin: 0;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase !important;
+        letter-spacing: 0.08em;
+        color: #888;
+    }
+
+    .info-row {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+    }
+
+    .info-row__label {
+        font-size: 0.7rem;
+        color: #888;
+    }
+
+    .info-row__value {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #1a1a1f;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 </style>
