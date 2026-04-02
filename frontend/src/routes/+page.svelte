@@ -549,7 +549,43 @@
         manual_pan_x = 0;
         manual_pan_y = 0;
     }
+
+    function handle_body_keydown(e) {
+        if (has_overlay) {
+            const step = e.shiftKey ? 10 : 1;
+            switch (e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cursor_pos_x -= step;
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cursor_pos_x += step;
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cursor_pos_y -= step;
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cursor_pos_y += step;
+                    break;
+                case 'Enter':
+                case ' ':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    save_overlay_coords();
+                    break;
+            }
+        }
+    }
 </script>
+
+<svelte:body onkeydown={handle_body_keydown} />
 
 {#if !started}
     <!-- ── Landing ─────────────────────────────────── -->
