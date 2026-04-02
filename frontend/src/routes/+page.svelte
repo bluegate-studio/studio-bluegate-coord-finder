@@ -551,7 +551,7 @@
     function handle_body_keydown(e) {
         if (show_delete_modal || show_copy_modal) return;
         if (has_overlay) {
-            const step = e.shiftKey ? 10 : 1;
+            const step = e.ctrlKey && e.shiftKey ? 100 : e.shiftKey ? 10 : 1;
             switch (e.key) {
                 case 'ArrowLeft':
                     e.preventDefault();
