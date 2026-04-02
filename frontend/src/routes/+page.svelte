@@ -1,5 +1,5 @@
 <script>
-    import { ImageUp } from '@lucide/svelte';
+    import { ImageUp, ClipboardCopy, Trash2 } from '@lucide/svelte';
 
     let image_src = $state(null);
     let file_name = $state('');
@@ -39,6 +39,9 @@
 
     /** @type {HTMLImageElement|null} */
     let img_el = $state(null);
+
+    /** @type {Array<{x: number, y: number, rx: number, ry: number}>} */
+    let saved_coords = $state([]);
 
     /** @param {File} file */
     function load_file(file) {
@@ -143,6 +146,16 @@
         hover_y = null;
     }
 
+    function handle_click() {
+        if (hover_x === null || real_hover_x === null) return;
+        saved_coords.push({
+            x: hover_x,
+            y: hover_y,
+            rx: real_hover_x,
+            ry: real_hover_y,
+        });
+    }
+
     let resize_timer;
     function measure_rendered_debounced() {
         clearTimeout(resize_timer);
@@ -198,9 +211,11 @@
                 alt={file_name}
                 loading="eager"
                 decoding="async"
+                role="application"
                 onload={handle_image_load}
                 onmousemove={handle_mouse_move}
                 onmouseleave={handle_mouse_leave}
+                onclick={handle_click}
             />
         </div>
 
@@ -232,6 +247,25 @@
                     <span class="info-row__label">Hover (X, Y)</span>
                     <span class="info-row__value">{hover_display}</span>
                 </div>
+            </div>
+
+            <div class="sidebar-section sidebar-section--grow">
+                <div class="sidebar-section__header">
+                    <h3 class="sidebar-section__title">Saved Coordinates</h3>
+                    <button class="sidebar-section__action" title="Copy to clipboard">
+                        <ClipboardCopy size={14} strokeWidth={2} />
+                    </button>
+                </div>
+
+                {#each saved_coords as coord, i}
+                    <div class="coord-row">
+                        <span class="coord-row__index">{i + 1}.</span>
+                        <span class="coord-row__value">x: {coord.x} y: {coord.y} | x: {coord.rx} y: {coord.ry}</span>
+                        <button class="coord-row__delete" title="Remove">
+                            <Trash2 size={13} strokeWidth={2} />
+                        </button>
+                    </div>
+                {/each}
             </div>
         </aside>
     </div>
@@ -387,6 +421,38 @@
         gap: 0.65rem;
     }
 
+    .sidebar-section--grow {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    .sidebar-section__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .sidebar-section__action {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.6rem;
+        height: 1.6rem;
+        padding: 0;
+        border: 1px solid #dcdce0;
+        border-radius: 0.35rem;
+        background: #fff;
+        color: #666;
+        cursor: pointer;
+        transition: color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .sidebar-section__action:hover {
+        color: #1a1a1f;
+        border-color: #aaa;
+    }
+
     .sidebar-section__title {
         margin: 0;
         font-size: 0.7rem;
@@ -414,5 +480,54 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    /* ── Coord Rows ──────────────────────────────── */
+    .coord-row {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.4rem 0;
+        border-bottom: 1px solid #ececf0;
+        font-size: 0.75rem;
+    }
+
+    .coord-row:last-child {
+        border-bottom: none;
+    }
+
+    .coord-row__index {
+        flex-shrink: 0;
+        width: 1.4rem;
+        font-weight: 600;
+        color: #999;
+    }
+
+    .coord-row__value {
+        flex: 1;
+        min-width: 0;
+        color: #1a1a1f;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .coord-row__delete {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.4rem;
+        height: 1.4rem;
+        padding: 0;
+        border: none;
+        border-radius: 0.25rem;
+        background: transparent;
+        color: #bbb;
+        cursor: pointer;
+        transition: color 0.15s ease, background 0.15s ease;
+    }
+
+    .coord-row__delete:hover {
+        color: #e44;
+        background: rgba(228, 68, 68, 0.08);
     }
 </style>
