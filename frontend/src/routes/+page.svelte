@@ -37,10 +37,28 @@
     let rendered_content_w = $state(0);
     let rendered_content_h = $state(0);
 
+    /* ── Custom cursor overlay state ──────────────── */
+    let cursor_natural_w = $state(0);
+    let cursor_natural_h = $state(0);
+    let cursor_pos_x = $state(0);
+    let cursor_pos_y = $state(0);
+
+    let scale_factor = $derived(rendered_content_w > 0 ? rendered_content_w / natural_w : 1);
+    let cursor_display_w = $derived(cursor_natural_w * scale_factor);
+    let cursor_display_h = $derived(cursor_natural_h * scale_factor);
+    let cursor_center_x = $derived(Math.round(cursor_pos_x + cursor_display_w / 2));
+    let cursor_center_y = $derived(Math.round(cursor_pos_y + cursor_display_h / 2));
+    let cursor_real_center_x = $derived(scale_factor > 0 ? Math.round(cursor_center_x / scale_factor) : 0);
+    let cursor_real_center_y = $derived(scale_factor > 0 ? Math.round(cursor_center_y / scale_factor) : 0);
+
+    let has_overlay = $derived(!!cursor_src && cursor_natural_w > 0);
+
     let hover_display = $derived(
-        hover_x !== null
-            ? `${hover_x}, ${hover_y}  |  ${real_hover_x}, ${real_hover_y}`
-            : '—'
+        has_overlay
+            ? `${cursor_center_x}, ${cursor_center_y}  |  ${cursor_real_center_x}, ${cursor_real_center_y}`
+            : hover_x !== null
+                ? `${hover_x}, ${hover_y}  |  ${real_hover_x}, ${real_hover_y}`
+                : '—'
     );
 
     /** @type {HTMLImageElement|null} */
@@ -97,7 +115,17 @@
         cursor_name = file.name;
         const reader = new FileReader();
         reader.onload = (e) => {
-            cursor_src = e.target.result;
+            const data_url = e.target.result;
+            cursor_src = data_url;
+            // Probe natural dimensions
+            const probe = new Image();
+            probe.onload = () => {
+                cursor_natural_w = probe.naturalWidth;
+                cursor_natural_h = probe.naturalHeight;
+                cursor_pos_x = 0;
+                cursor_pos_y = 0;
+            };
+            probe.src = data_url;
         };
         reader.readAsDataURL(file);
     }
@@ -128,6 +156,22 @@
         if (!img_el) return;
         rendered_w = img_el.clientWidth;
         rendered_h = img_el.clientHeight;
+
+        // Keep content dimensions in sync for overlay positioning
+        const rect = get_content_rect();
+        if (rect) {
+            const old_cw = rendered_content_w;
+            const old_ch = rendered_content_h;
+
+            rendered_content_w = rect.content_w;
+            rendered_content_h = rect.content_h;
+
+            // Rescale cursor position proportionally on resize
+            if (cursor_src && old_cw > 0 && old_ch > 0) {
+                cursor_pos_x *= rect.content_w / old_cw;
+                cursor_pos_y *= rect.content_h / old_ch;
+            }
+        }
     }
 
     /**
@@ -162,6 +206,7 @@
     }
 
     function handle_mouse_move(e) {
+        if (has_overlay) return; // overlay mode: sidebar shows overlay center instead
         const rect_info = get_content_rect();
         if (!rect_info) return;
 
@@ -184,11 +229,13 @@
     }
 
     function handle_mouse_leave() {
+        if (has_overlay) return;
         hover_x = null;
         hover_y = null;
     }
 
     function handle_click() {
+        if (has_overlay) return; // in overlay mode, only overlay saves
         if (hover_x === null || real_hover_x === null) return;
         saved_coords.push({
             x: hover_x,
@@ -196,6 +243,93 @@
             rx: real_hover_x,
             ry: real_hover_y,
         });
+    }
+
+    /* ── Overlay drag ─────────────────────────────── */
+    let is_overlay_dragging = $state(false);
+    let drag_start_mouse_x = 0;
+    let drag_start_mouse_y = 0;
+    let drag_start_pos_x = 0;
+    let drag_start_pos_y = 0;
+
+    function start_overlay_drag(e) {
+        e.preventDefault();
+        is_overlay_dragging = true;
+        drag_start_mouse_x = e.clientX;
+        drag_start_mouse_y = e.clientY;
+        drag_start_pos_x = cursor_pos_x;
+        drag_start_pos_y = cursor_pos_y;
+        document.addEventListener('mousemove', do_overlay_drag);
+        document.addEventListener('mouseup', end_overlay_drag);
+    }
+
+    function do_overlay_drag(e) {
+        cursor_pos_x = drag_start_pos_x + (e.clientX - drag_start_mouse_x);
+        cursor_pos_y = drag_start_pos_y + (e.clientY - drag_start_mouse_y);
+    }
+
+    function end_overlay_drag() {
+        is_overlay_dragging = false;
+        document.removeEventListener('mousemove', do_overlay_drag);
+        document.removeEventListener('mouseup', end_overlay_drag);
+    }
+
+    /* ── Overlay keyboard ─────────────────────────── */
+    /** @type {HTMLDivElement|null} */
+    let overlay_el = $state(null);
+
+    function handle_overlay_keydown(e) {
+        const step = e.shiftKey ? 10 : 1;
+
+        switch (e.key) {
+            case 'ArrowLeft':
+                e.preventDefault();
+                cursor_pos_x -= step;
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                cursor_pos_x += step;
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                cursor_pos_y -= step;
+                break;
+            case 'ArrowDown':
+                e.preventDefault();
+                cursor_pos_y += step;
+                break;
+            case 'Enter':
+            case ' ':
+                e.preventDefault();
+                save_overlay_coords();
+                break;
+        }
+    }
+
+    function save_overlay_coords() {
+        saved_coords.push({
+            x: cursor_center_x,
+            y: cursor_center_y,
+            rx: cursor_real_center_x,
+            ry: cursor_real_center_y,
+        });
+    }
+
+    /**
+     * Compute the overlay's absolute CSS left/top within the canvas.
+     */
+    function get_overlay_left() {
+        if (!img_el) return 0;
+        const rect = get_content_rect();
+        if (!rect) return 0;
+        return img_el.offsetLeft + rect.offset_x + cursor_pos_x;
+    }
+
+    function get_overlay_top() {
+        if (!img_el) return 0;
+        const rect = get_content_rect();
+        if (!rect) return 0;
+        return img_el.offsetTop + rect.offset_y + cursor_pos_y;
     }
 
     /* ── Delete confirmation ──────────────────────── */
@@ -370,6 +504,8 @@
     <!-- ── Workspace ──────────────────────────────── -->
     <div class="workspace">
         <div class="workspace__canvas">
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
             <img
                 bind:this={img_el}
                 src={image_src}
@@ -377,11 +513,30 @@
                 loading="eager"
                 decoding="async"
                 role="application"
+                class:has-overlay={has_overlay}
                 onload={handle_image_load}
                 onmousemove={handle_mouse_move}
                 onmouseleave={handle_mouse_leave}
                 onclick={handle_click}
             />
+
+            {#if has_overlay}
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                <div
+                    class="cursor-overlay"
+                    class:dragging={is_overlay_dragging}
+                    bind:this={overlay_el}
+                    tabindex="0"
+                    style:left="{get_overlay_left()}px"
+                    style:top="{get_overlay_top()}px"
+                    style:width="{cursor_display_w}px"
+                    style:height="{cursor_display_h}px"
+                    style:background-image="url({cursor_src})"
+                    onmousedown={start_overlay_drag}
+                    onkeydown={handle_overlay_keydown}
+                ></div>
+            {/if}
         </div>
 
         <aside class="workspace__sidebar">
@@ -677,6 +832,7 @@
         display: flex;
         align-items: flex-start;
         justify-content: center;
+        position: relative;
     }
 
     .workspace__canvas img {
@@ -685,6 +841,29 @@
         object-fit: contain;
         object-position: 50% 0%;
         cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cline x1='16' y1='0' x2='16' y2='32' stroke='%23fff' stroke-width='1.5'/%3E%3Cline x1='0' y1='16' x2='32' y2='16' stroke='%23fff' stroke-width='1.5'/%3E%3Cline x1='16' y1='0' x2='16' y2='32' stroke='%23000' stroke-width='0.75'/%3E%3Cline x1='0' y1='16' x2='32' y2='16' stroke='%23000' stroke-width='0.75'/%3E%3C/svg%3E") 16 16, crosshair;
+    }
+
+    .workspace__canvas img.has-overlay {
+        cursor: default;
+    }
+
+    /* ── Cursor Overlay ──────────────────────────── */
+    .cursor-overlay {
+        position: absolute;
+        background-size: 100% 100%;
+        background-repeat: no-repeat;
+        cursor: grab;
+        outline: none;
+        z-index: 10;
+        user-select: none;
+    }
+
+    .cursor-overlay:focus {
+        box-shadow: 0 0 0 2px var(--clr-accent);
+    }
+
+    .cursor-overlay.dragging {
+        cursor: grabbing;
     }
 
     /* ── Sidebar ──────────────────────────────────── */
