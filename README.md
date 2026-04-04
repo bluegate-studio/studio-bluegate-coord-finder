@@ -67,9 +67,11 @@ The overlay will appear on top of your main image, scaled proportionally. You th
 
 **Mode 2 (Overlay active):** Position the overlay using drag and/or arrow keys, then press `Enter` or `Space` to save the overlay's center coordinate.
 
-### Step 4: Export
+### Step 4: Export & Resume
 
-Click the 📋 clipboard icon next to "Saved Coordinates" to copy all coordinates as JSON.
+Click the 📋 clipboard icon to copy all coordinates as JSON. Save this to a file to preserve your progress.
+
+To **continue where you left off**, click the ⬇️ import icon (left of clipboard) and load a previously exported `.json` file. The imported coordinates are appended to any existing entries, so you can merge sessions.
 
 ---
 
@@ -115,6 +117,7 @@ Click the 📋 clipboard icon next to "Saved Coordinates" to copy all coordinate
 | Action | How |
 |---|---|
 | Delete entry | Click 🗑️ on the row (instant, no confirmation) |
+| Import from JSON | Click ⬇️ in the section header, select a `.json` file |
 | Copy all as JSON | Click 📋 in the section header |
 | Auto-scroll | New entries scroll the list to the bottom |
 
@@ -186,6 +189,15 @@ Coordinates are exported as a JSON object with two arrays—**real** (original i
 | `scaled` | Coordinates in the **rendered** image space (as displayed on screen) |
 
 For most use cases, you want `real`.
+
+### Resuming a Session
+
+Coord Finder is client-side only—there's no database or auto-save. To preserve your work:
+
+1. **Copy** coordinates to clipboard (📋) and paste into a `.json` file
+2. Next time, **import** that file (⬇️) to pick up where you left off
+
+Imported coordinates are appended, so you can also merge results from multiple sessions.
 
 ---
 
