@@ -1,11 +1,37 @@
 <script>
     import { tick } from 'svelte';
-    import { ImageUp, ClipboardCopy, Trash2, MousePointer2, Minus, Plus, Import } from '@lucide/svelte';
+    import { ImageUp, ClipboardCopy, Trash2, MousePointer2, Minus, Plus, Import, ChevronDown } from '@lucide/svelte';
 
     let image_src = $state(null);
     let file_name = $state('');
     let is_dragging = $state(false);
     let started = $state(false);
+    let show_image_info = $state(true);
+    let show_settings = $state(true);
+
+    /* ── Arrow key step sizes (real pixels) ───────── */
+    const SETTINGS_KEY = 'coord_finder_settings';
+
+    function load_settings() {
+        try {
+            const raw = localStorage.getItem(SETTINGS_KEY);
+            if (raw) return JSON.parse(raw);
+        } catch (_) { /* ignore */ }
+        return {};
+    }
+
+    const saved = load_settings();
+    let step_ud = $state(saved.step_ud ?? 1);
+    let step_lr = $state(saved.step_lr ?? 1);
+    let step_shift_ud = $state(saved.step_shift_ud ?? 10);
+    let step_shift_lr = $state(saved.step_shift_lr ?? 10);
+    let step_ctrl_shift_ud = $state(saved.step_ctrl_shift_ud ?? 100);
+    let step_ctrl_shift_lr = $state(saved.step_ctrl_shift_lr ?? 100);
+
+    $effect(() => {
+        const payload = { step_ud, step_lr, step_shift_ud, step_shift_lr, step_ctrl_shift_ud, step_ctrl_shift_lr };
+        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(payload)); } catch (_) { /* ignore */ }
+    });
 
     /* ── Custom cursor image (no-op for now) ──────── */
     let cursor_src = $state(null);
@@ -700,7 +726,15 @@
     function handle_body_keydown(e) {
         if (show_copy_modal || show_import_error_modal) return;
         if (has_overlay) {
-            const step = e.ctrlKey && e.shiftKey ? 100 : e.shiftKey ? 10 : 1;
+            const is_vertical = e.key === 'ArrowUp' || e.key === 'ArrowDown';
+            let step;
+            if (e.ctrlKey && e.shiftKey) {
+                step = is_vertical ? step_ctrl_shift_ud : step_ctrl_shift_lr;
+            } else if (e.shiftKey) {
+                step = is_vertical ? step_shift_ud : step_shift_lr;
+            } else {
+                step = is_vertical ? step_ud : step_lr;
+            }
             switch (e.key) {
                 case 'ArrowLeft':
                     e.preventDefault();
@@ -866,8 +900,16 @@
 
         <aside class="workspace__sidebar">
             <div class="sidebar-section">
-                <h3 class="sidebar-section__title">Image Info</h3>
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <div class="sidebar-section__toggle" onclick={() => show_image_info = !show_image_info}>
+                    <h3 class="sidebar-section__title">Image Info</h3>
+                    <span class="sidebar-section__chevron" class:open={show_image_info}>
+                        <ChevronDown size={14} strokeWidth={2} />
+                    </span>
+                </div>
 
+                {#if show_image_info}
                 <div class="info-row">
                     <span class="info-row__label">File</span>
                     <span class="info-row__value" title={file_name}>{file_name}</span>
@@ -912,6 +954,104 @@
                     <span class="info-row__label">Hover (X, Y)</span>
                     <span class="info-row__value">{hover_display}</span>
                 </div>
+                {/if}
+            </div>
+
+            <div class="sidebar-section">
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <div class="sidebar-section__toggle" onclick={() => show_settings = !show_settings}>
+                    <h3 class="sidebar-section__title">Settings</h3>
+                    <span class="sidebar-section__chevron" class:open={show_settings}>
+                        <ChevronDown size={14} strokeWidth={2} />
+                    </span>
+                </div>
+
+                {#if show_settings}
+                <div class="info-row">
+                    <span class="info-row__label">↑↓</span>
+                    <span class="info-row__value">
+                        <input
+                            class="setting-input"
+                            type="number"
+                            min="1"
+                            bind:value={step_ud}
+                            disabled={!has_overlay}
+                        />
+                        <span class="setting-unit">px</span>
+                    </span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-row__label">←→</span>
+                    <span class="info-row__value">
+                        <input
+                            class="setting-input"
+                            type="number"
+                            min="1"
+                            bind:value={step_lr}
+                            disabled={!has_overlay}
+                        />
+                        <span class="setting-unit">px</span>
+                    </span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-row__label">Shift+↑↓</span>
+                    <span class="info-row__value">
+                        <input
+                            class="setting-input"
+                            type="number"
+                            min="1"
+                            bind:value={step_shift_ud}
+                            disabled={!has_overlay}
+                        />
+                        <span class="setting-unit">px</span>
+                    </span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-row__label">Shift+←→</span>
+                    <span class="info-row__value">
+                        <input
+                            class="setting-input"
+                            type="number"
+                            min="1"
+                            bind:value={step_shift_lr}
+                            disabled={!has_overlay}
+                        />
+                        <span class="setting-unit">px</span>
+                    </span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-row__label">Ctrl+Shift+↑↓</span>
+                    <span class="info-row__value">
+                        <input
+                            class="setting-input"
+                            type="number"
+                            min="1"
+                            bind:value={step_ctrl_shift_ud}
+                            disabled={!has_overlay}
+                        />
+                        <span class="setting-unit">px</span>
+                    </span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-row__label">Ctrl+Shift+←→</span>
+                    <span class="info-row__value">
+                        <input
+                            class="setting-input"
+                            type="number"
+                            min="1"
+                            bind:value={step_ctrl_shift_lr}
+                            disabled={!has_overlay}
+                        />
+                        <span class="setting-unit">px</span>
+                    </span>
+                </div>
+                {/if}
             </div>
 
             <div class="sidebar-section sidebar-section--grow">
@@ -1387,10 +1527,30 @@
         color: #888;
     }
 
+    .sidebar-section__toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .sidebar-section__chevron {
+        display: flex;
+        align-items: center;
+        color: #888;
+        transition: transform 0.2s ease;
+    }
+
+    .sidebar-section__chevron.open {
+        transform: rotate(180deg);
+    }
+
     .info-row {
         display: flex;
-        flex-direction: column;
-        gap: 0.15rem;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
     }
 
     .info-row__label {
@@ -1399,12 +1559,54 @@
     }
 
     .info-row__value {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.3rem;
         font-size: 0.85rem;
         font-weight: 500;
         color: #1a1a1f;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    /* ── Setting Inputs ──────────────────────────── */
+    .setting-input {
+        width: 4rem;
+        height: 1.4rem;
+        padding: 0 0.3rem;
+        border: 1px solid var(--clr-border);
+        border-radius: 0.3rem;
+        background: #fff;
+        color: #000;
+        font-size: 0.72rem;
+        font-family: inherit;
+        text-align: center;
+        -moz-appearance: textfield;
+    }
+
+    .setting-input::-webkit-inner-spin-button,
+    .setting-input::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .setting-input:focus {
+        outline: none;
+        border-color: var(--clr-accent);
+    }
+
+    .setting-input:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .setting-unit {
+        font-size: 0.7rem;
+        color: #888;
     }
 
     /* ── Coord Table ─────────────────────────────── */
