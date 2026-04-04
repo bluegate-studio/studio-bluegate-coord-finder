@@ -219,6 +219,9 @@
     function handle_begin() {
         if (!image_src) return;
         started = true;
+        if (saved_coords.length) {
+            setTimeout(scroll_to_last_coord, 50);
+        }
     }
 
     function handle_file_select(e) {
@@ -663,17 +666,58 @@
             }
         }
 
-        // All good — append to saved_coords
+        // All good — validated data ready
+        const new_coords = [];
         for (let i = 0; i < real.length; i++) {
-            saved_coords.push({
+            new_coords.push({
                 x: scaled[i].x,
                 y: scaled[i].y,
                 rx: real[i].x,
                 ry: real[i].y,
             });
         }
+
+        if (saved_coords.length) {
+            pending_import = new_coords;
+            show_import_confirm_modal = true;
+        } else {
+            apply_import(new_coords);
+        }
+    }
+
+    function apply_import(coords) {
+        saved_coords.length = 0;
+        for (const c of coords) saved_coords.push(c);
         setTimeout(scroll_to_last_coord, 0);
     }
+
+    /* ── Import confirmation (existing data) ──────── */
+    let show_import_confirm_modal = $state(false);
+    let pending_import = $state(null);
+
+    /** @type {HTMLDivElement|null} */
+    let import_confirm_veil_el = $state(null);
+
+    function confirm_import_replace() {
+        if (pending_import) apply_import(pending_import);
+        pending_import = null;
+        show_import_confirm_modal = false;
+    }
+
+    function dismiss_import_confirm() {
+        pending_import = null;
+        show_import_confirm_modal = false;
+    }
+
+    function handle_import_confirm_keyup(e) {
+        if (e.key === 'Escape') dismiss_import_confirm();
+    }
+
+    $effect(() => {
+        if (show_import_confirm_modal && import_confirm_veil_el) {
+            import_confirm_veil_el.focus();
+        }
+    });
 
     function show_import_error(message) {
         import_error_message = message;
@@ -765,7 +809,7 @@
     }
 
     function handle_body_keydown(e) {
-        if (show_copy_modal || show_import_error_modal || show_clear_modal) return;
+        if (show_copy_modal || show_import_error_modal || show_clear_modal || show_import_confirm_modal) return;
         if (has_overlay) {
             const is_vertical = e.key === 'ArrowUp' || e.key === 'ArrowDown';
             let step;
@@ -1099,11 +1143,11 @@
                 <div class="sidebar-section__header">
                     <h3 class="sidebar-section__title">Saved Coordinates</h3>
                     <div class="sidebar-section__actions">
-                        <button class="sidebar-section__action" title="Import from JSON" onclick={trigger_import}>
-                            <Import size={14} strokeWidth={2} />
-                        </button>
                         <button class="sidebar-section__action" title="Clear all coordinates" onclick={request_clear_all}>
                             <Trash2 size={14} strokeWidth={2} />
+                        </button>
+                        <button class="sidebar-section__action" title="Import from JSON" onclick={trigger_import}>
+                            <Import size={14} strokeWidth={2} />
                         </button>
                         <button class="sidebar-section__action" title="Copy to clipboard" onclick={handle_copy}>
                             <ClipboardCopy size={14} strokeWidth={2} />
@@ -1250,6 +1294,28 @@
             <div class="modal-dialog__actions">
                 <button class="modal-dialog__btn modal-dialog__btn--cancel" onclick={dismiss_clear_modal}>Cancel</button>
                 <button class="modal-dialog__btn modal-dialog__btn--delete" onclick={confirm_clear_all}>Clear All</button>
+            </div>
+        </div>
+    </div>
+{/if}
+
+{#if show_import_confirm_modal}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+        class="modal-veil"
+        bind:this={import_confirm_veil_el}
+        tabindex="-1"
+        onclick={dismiss_import_confirm}
+        onkeyup={handle_import_confirm_keyup}
+    >
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="modal-dialog" onclick={(e) => e.stopPropagation()}>
+            <p class="modal-dialog__title">Replace existing coordinates?</p>
+            <p class="modal-dialog__text">You have {saved_coords.length} saved coordinate{saved_coords.length === 1 ? '' : 's'}. Importing will replace all of them. If you want to keep the existing data, copy them to your clipboard first and merge manually.</p>
+            <div class="modal-dialog__actions">
+                <button class="modal-dialog__btn modal-dialog__btn--cancel" onclick={dismiss_import_confirm}>Cancel</button>
+                <button class="modal-dialog__btn modal-dialog__btn--delete" onclick={confirm_import_replace}>Replace</button>
             </div>
         </div>
     </div>
