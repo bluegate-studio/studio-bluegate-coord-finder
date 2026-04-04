@@ -128,7 +128,18 @@
     let zoom_display = $derived(Math.round(zoom).toString());
 
     /** @type {Array<{x: number, y: number, rx: number, ry: number}>} */
-    let saved_coords = $state([]);
+    const COORDS_KEY = 'coord_finder_coords';
+    let saved_coords = $state((() => {
+        try {
+            const raw = localStorage.getItem(COORDS_KEY);
+            if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr)) return arr; }
+        } catch (_) { /* ignore */ }
+        return [];
+    })());
+
+    $effect(() => {
+        try { localStorage.setItem(COORDS_KEY, JSON.stringify(saved_coords)); } catch (_) { /* ignore */ }
+    });
 
     /** @param {File} file */
     function load_file(file) {
@@ -560,6 +571,36 @@
         }
     });
 
+    /* ── Clear all coordinates ──────────────────── */
+    let show_clear_modal = $state(false);
+
+    /** @type {HTMLDivElement|null} */
+    let clear_veil_el = $state(null);
+
+    function request_clear_all() {
+        if (!saved_coords.length) return;
+        show_clear_modal = true;
+    }
+
+    function confirm_clear_all() {
+        saved_coords.length = 0;
+        show_clear_modal = false;
+    }
+
+    function dismiss_clear_modal() {
+        show_clear_modal = false;
+    }
+
+    function handle_clear_modal_keyup(e) {
+        if (e.key === 'Escape') dismiss_clear_modal();
+    }
+
+    $effect(() => {
+        if (show_clear_modal && clear_veil_el) {
+            clear_veil_el.focus();
+        }
+    });
+
     /* ── Import from JSON ────────────────────────── */
     let show_import_error_modal = $state(false);
     let import_error_message = $state('');
@@ -724,7 +765,7 @@
     }
 
     function handle_body_keydown(e) {
-        if (show_copy_modal || show_import_error_modal) return;
+        if (show_copy_modal || show_import_error_modal || show_clear_modal) return;
         if (has_overlay) {
             const is_vertical = e.key === 'ArrowUp' || e.key === 'ArrowDown';
             let step;
@@ -1061,6 +1102,9 @@
                         <button class="sidebar-section__action" title="Import from JSON" onclick={trigger_import}>
                             <Import size={14} strokeWidth={2} />
                         </button>
+                        <button class="sidebar-section__action" title="Clear all coordinates" onclick={request_clear_all}>
+                            <Trash2 size={14} strokeWidth={2} />
+                        </button>
                         <button class="sidebar-section__action" title="Copy to clipboard" onclick={handle_copy}>
                             <ClipboardCopy size={14} strokeWidth={2} />
                         </button>
@@ -1184,6 +1228,28 @@
             <p class="modal-dialog__text">{import_error_message}</p>
             <div class="modal-dialog__actions">
                 <button class="modal-dialog__btn modal-dialog__btn--ok" onclick={dismiss_import_error_modal}>OK</button>
+            </div>
+        </div>
+    </div>
+{/if}
+
+{#if show_clear_modal}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+        class="modal-veil"
+        bind:this={clear_veil_el}
+        tabindex="-1"
+        onclick={dismiss_clear_modal}
+        onkeyup={handle_clear_modal_keyup}
+    >
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="modal-dialog" onclick={(e) => e.stopPropagation()}>
+            <p class="modal-dialog__title">Clear all coordinates?</p>
+            <p class="modal-dialog__text">This will permanently remove all saved coordinates from storage. Make sure you’ve copied them to your clipboard first.</p>
+            <div class="modal-dialog__actions">
+                <button class="modal-dialog__btn modal-dialog__btn--cancel" onclick={dismiss_clear_modal}>Cancel</button>
+                <button class="modal-dialog__btn modal-dialog__btn--delete" onclick={confirm_clear_all}>Clear All</button>
             </div>
         </div>
     </div>
