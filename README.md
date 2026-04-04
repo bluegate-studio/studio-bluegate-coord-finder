@@ -67,11 +67,15 @@ The overlay will appear on top of your main image, scaled proportionally. You th
 
 **Mode 2 (Overlay active):** Position the overlay using drag and/or arrow keys, then press `Enter` or `Space` to save the overlay's center coordinate.
 
-### Step 4: Export & Resume
+### Step 4: Export, Import & Resume
 
-Click the 📋 clipboard icon to copy all coordinates as JSON. Save this to a file to preserve your progress.
+Click the 📋 clipboard icon to copy all coordinates as JSON.
 
-To **continue where you left off**, click the ⬇️ import icon (left of clipboard) and load a previously exported `.json` file. The imported coordinates are appended to any existing entries, so you can merge sessions.
+To **import** a previously exported `.json` file, click the ⬇️ import icon. If the coordinate list is empty, the data loads directly. If you already have saved coordinates, you'll be asked to confirm—importing **replaces** all existing entries (copy them first if you need to keep them).
+
+To **clear everything**, click the 🗑️ trash icon. A confirmation dialog makes sure you don't lose unsaved work.
+
+> **Auto-save:** Both your saved coordinates and settings are stored in `localStorage`. Close the tab, come back later, and everything is still there—no manual export needed for session continuity.
 
 ---
 
@@ -98,7 +102,7 @@ To **continue where you left off**, click the ⬇️ import icon (left of clipbo
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                                                         │
-│   MOVE OVERLAY         KEY              STEP SIZE       │
+│   MOVE OVERLAY         KEY              DEFAULT STEP    │
 │   ─────────────────────────────────────────────────     │
 │   Fine nudge           Arrow keys       1 real px       │
 │   Medium nudge         Shift + Arrow    10 real px      │
@@ -110,6 +114,8 @@ To **continue where you left off**, click the ⬇️ import icon (left of clipbo
 └─────────────────────────────────────────────────────────┘
 ```
 
+All step sizes are configurable in the **Settings** panel (see below).
+
 > **Real pixels, not screen pixels.** Arrow keys always move in the original image's coordinate space. If your image is 3000px wide but displayed at 1000px, pressing `→` once moves exactly 1 real pixel—not 1 screen pixel. This guarantees **zero rounding drift** across hundreds of captures.
 
 ### Saved Coordinates
@@ -117,9 +123,27 @@ To **continue where you left off**, click the ⬇️ import icon (left of clipbo
 | Action | How |
 |---|---|
 | Delete entry | Click 🗑️ on the row (instant, no confirmation) |
+| Clear all | Click 🗑️ in the section header (with confirmation) |
 | Import from JSON | Click ⬇️ in the section header, select a `.json` file |
 | Copy all as JSON | Click 📋 in the section header |
 | Auto-scroll | New entries scroll the list to the bottom |
+
+### Settings Panel
+
+The sidebar includes a collapsible **Settings** section where you can customise arrow key step sizes:
+
+| Setting | Default | Controls |
+|---|---|---|
+| ↑↓ | 1 px | Arrow Up / Down step |
+| ←→ | 1 px | Arrow Left / Right step |
+| Shift+↑↓ | 10 px | Shift + Arrow Up / Down step |
+| Shift+←→ | 10 px | Shift + Arrow Left / Right step |
+| Ctrl+Shift+↑↓ | 100 px | Ctrl+Shift + Arrow Up / Down step |
+| Ctrl+Shift+←→ | 100 px | Ctrl+Shift + Arrow Left / Right step |
+
+Settings are disabled when no overlay cursor is loaded (arrow keys only apply in overlay mode). All values persist in `localStorage`.
+
+> Both **Image Info** and **Settings** sections are collapsible—click the section title to expand or collapse.
 
 ---
 
@@ -190,14 +214,14 @@ Coordinates are exported as a JSON object with two arrays—**real** (original i
 
 For most use cases, you want `real`.
 
-### Resuming a Session
+### Session Persistence
 
-Coord Finder is client-side only—there's no database or auto-save. To preserve your work:
+Coord Finder automatically saves to `localStorage`:
 
-1. **Copy** coordinates to clipboard (📋) and paste into a `.json` file
-2. Next time, **import** that file (⬇️) to pick up where you left off
+- **Saved coordinates** — restored when you return, with the list auto-scrolled to the bottom
+- **Settings** — your custom step sizes persist across sessions
 
-Imported coordinates are appended, so you can also merge results from multiple sessions.
+For sharing or backup, use the clipboard export (📋) to get a portable `.json` file.
 
 ---
 
