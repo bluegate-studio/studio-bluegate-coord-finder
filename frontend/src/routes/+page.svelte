@@ -432,7 +432,7 @@
     }
 
     function scroll_to_last_coord() {
-        const section = document.querySelector('.sidebar-section--grow');
+        const section = document.querySelector('.coord-scroll');
         if (section) section.scrollTop = section.scrollHeight;
     }
 
@@ -935,6 +935,11 @@
                 />
 
                 <table class="coord-table">
+                    <colgroup>
+                        <col class="coord-col--index" />
+                        <col /><col /><col /><col />
+                        <col class="coord-col--action" />
+                    </colgroup>
                     <thead>
                         <tr>
                             <th class="coord-table__th" rowspan="2">#</th>
@@ -949,23 +954,33 @@
                             <th class="coord-table__th">Y</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {#each saved_coords as coord, i}
-                            <tr class="coord-table__row">
-                                <td class="coord-table__td coord-table__td--index">{i + 1}</td>
-                                <td class="coord-table__td">{coord.x}</td>
-                                <td class="coord-table__td">{coord.y}</td>
-                                <td class="coord-table__td">{coord.rx}</td>
-                                <td class="coord-table__td">{coord.ry}</td>
-                                <td class="coord-table__td coord-table__td--action">
-                                    <button class="coord-table__delete" title="Remove" onclick={() => direct_delete(i)}>
-                                        <Trash2 size={13} strokeWidth={2} />
-                                    </button>
-                                </td>
-                            </tr>
-                        {/each}
-                    </tbody>
                 </table>
+
+                <div class="coord-scroll">
+                    <table class="coord-table">
+                        <colgroup>
+                            <col class="coord-col--index" />
+                            <col /><col /><col /><col />
+                            <col class="coord-col--action" />
+                        </colgroup>
+                        <tbody>
+                            {#each saved_coords as coord, i}
+                                <tr class="coord-table__row">
+                                    <td class="coord-table__td coord-table__td--index">{i + 1}</td>
+                                    <td class="coord-table__td">{coord.x}</td>
+                                    <td class="coord-table__td">{coord.y}</td>
+                                    <td class="coord-table__td">{coord.rx}</td>
+                                    <td class="coord-table__td">{coord.ry}</td>
+                                    <td class="coord-table__td coord-table__td--action">
+                                        <button class="coord-table__delete" title="Remove" onclick={() => direct_delete(i)}>
+                                            <Trash2 size={13} strokeWidth={2} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </aside>
     </div>
@@ -1322,6 +1337,12 @@
     .sidebar-section--grow {
         flex: 1;
         min-height: 0;
+        overflow: hidden;
+    }
+
+    .coord-scroll {
+        flex: 1;
+        min-height: 0;
         overflow-y: auto;
     }
 
@@ -1389,9 +1410,18 @@
     /* ── Coord Table ─────────────────────────────── */
     .coord-table {
         width: 100%;
+        table-layout: fixed;
         border-collapse: collapse;
         font-size: 0.72rem;
         font-variant-numeric: tabular-nums;
+    }
+
+    .coord-col--index {
+        width: 2rem;
+    }
+
+    .coord-col--action {
+        width: 2rem;
     }
 
     .coord-table__th {
@@ -1422,11 +1452,9 @@
     .coord-table__td--index {
         font-weight: 600;
         color: #999;
-        width: 1.6rem;
     }
 
     .coord-table__td--action {
-        width: 1.6rem;
         padding: 0.2rem;
     }
 
