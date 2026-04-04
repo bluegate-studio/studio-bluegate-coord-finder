@@ -1,6 +1,6 @@
 <script>
     import { tick } from 'svelte';
-    import { ImageUp, ClipboardCopy, Trash2, MousePointer2, Minus, Plus } from '@lucide/svelte';
+    import { ImageUp, ClipboardCopy, Trash2, MousePointer2, Minus, Plus, Import } from '@lucide/svelte';
 
     let image_src = $state(null);
     let file_name = $state('');
@@ -534,6 +534,104 @@
         }
     });
 
+    /* ── Import from JSON ────────────────────────── */
+    let show_import_error_modal = $state(false);
+    let import_error_message = $state('');
+
+    /** @type {HTMLInputElement|null} */
+    let import_input_el = $state(null);
+
+    function trigger_import() {
+        if (import_input_el) {
+            import_input_el.value = '';
+            import_input_el.click();
+        }
+    }
+
+    function handle_import_file(e) {
+        const file = e.target?.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const parsed = JSON.parse(ev.target.result);
+                validate_and_import(parsed);
+            } catch (_) {
+                show_import_error('The file does not contain valid JSON.');
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function validate_and_import(data) {
+        if (!data || typeof data !== 'object') {
+            return show_import_error('Expected a JSON object with "real" and "scaled" arrays.');
+        }
+
+        const real = data.real;
+        const scaled = data.scaled;
+
+        if (!Array.isArray(real) || !Array.isArray(scaled)) {
+            return show_import_error('Expected a JSON object with "real" and "scaled" arrays.');
+        }
+
+        if (real.length === 0) {
+            return show_import_error('The "real" array is empty — nothing to import.');
+        }
+
+        if (real.length !== scaled.length) {
+            return show_import_error(`Array length mismatch: "real" has ${real.length} items but "scaled" has ${scaled.length}.`);
+        }
+
+        for (let i = 0; i < real.length; i++) {
+            const r = real[i];
+            const s = scaled[i];
+
+            if (
+                typeof r?.x !== 'number' || typeof r?.y !== 'number' ||
+                typeof s?.x !== 'number' || typeof s?.y !== 'number'
+            ) {
+                return show_import_error(`Invalid coordinate at index ${i}. Each entry must have numeric "x" and "y" fields.`);
+            }
+        }
+
+        // All good — append to saved_coords
+        for (let i = 0; i < real.length; i++) {
+            saved_coords.push({
+                x: scaled[i].x,
+                y: scaled[i].y,
+                rx: real[i].x,
+                ry: real[i].y,
+            });
+        }
+        setTimeout(scroll_to_last_coord, 0);
+    }
+
+    function show_import_error(message) {
+        import_error_message = message;
+        show_import_error_modal = true;
+    }
+
+    function dismiss_import_error_modal() {
+        show_import_error_modal = false;
+    }
+
+    function handle_import_error_keyup(e) {
+        if (e.key === 'Enter' || e.key === 'Escape') {
+            dismiss_import_error_modal();
+        }
+    }
+
+    /** @type {HTMLDivElement|null} */
+    let import_error_veil_el = $state(null);
+
+    $effect(() => {
+        if (show_import_error_modal && import_error_veil_el) {
+            import_error_veil_el.focus();
+        }
+    });
+
     let resize_timer;
     function measure_rendered_debounced() {
         clearTimeout(resize_timer);
@@ -600,7 +698,7 @@
     }
 
     function handle_body_keydown(e) {
-        if (show_copy_modal) return;
+        if (show_copy_modal || show_import_error_modal) return;
         if (has_overlay) {
             const step = e.ctrlKey && e.shiftKey ? 100 : e.shiftKey ? 10 : 1;
             switch (e.key) {
@@ -819,10 +917,22 @@
             <div class="sidebar-section sidebar-section--grow">
                 <div class="sidebar-section__header">
                     <h3 class="sidebar-section__title">Saved Coordinates</h3>
-                    <button class="sidebar-section__action" title="Copy to clipboard" onclick={handle_copy}>
-                        <ClipboardCopy size={14} strokeWidth={2} />
-                    </button>
+                    <div class="sidebar-section__actions">
+                        <button class="sidebar-section__action" title="Import from JSON" onclick={trigger_import}>
+                            <Import size={14} strokeWidth={2} />
+                        </button>
+                        <button class="sidebar-section__action" title="Copy to clipboard" onclick={handle_copy}>
+                            <ClipboardCopy size={14} strokeWidth={2} />
+                        </button>
+                    </div>
                 </div>
+                <input
+                    bind:this={import_input_el}
+                    type="file"
+                    accept=".json,application/json"
+                    onchange={handle_import_file}
+                    style="display:none"
+                />
 
                 <table class="coord-table">
                     <thead>
@@ -898,6 +1008,27 @@
             <p class="modal-dialog__text">All {saved_coords.length} saved coordinates are in your clipboard as JSON, ready to paste.</p>
             <div class="modal-dialog__actions">
                 <button class="modal-dialog__btn modal-dialog__btn--ok" onclick={dismiss_copy_modal}>OK</button>
+            </div>
+        </div>
+    </div>
+{/if}
+
+{#if show_import_error_modal}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+        class="modal-veil"
+        bind:this={import_error_veil_el}
+        tabindex="-1"
+        onclick={dismiss_import_error_modal}
+        onkeyup={handle_import_error_keyup}
+    >
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="modal-dialog" onclick={(e) => e.stopPropagation()}>
+            <p class="modal-dialog__title">Import Failed</p>
+            <p class="modal-dialog__text">{import_error_message}</p>
+            <div class="modal-dialog__actions">
+                <button class="modal-dialog__btn modal-dialog__btn--ok" onclick={dismiss_import_error_modal}>OK</button>
             </div>
         </div>
     </div>
@@ -1198,6 +1329,12 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
+    }
+
+    .sidebar-section__actions {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
     }
 
     .sidebar-section__action {
